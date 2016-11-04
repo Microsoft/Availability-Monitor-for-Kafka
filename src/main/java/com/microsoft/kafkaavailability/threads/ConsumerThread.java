@@ -188,6 +188,7 @@ public class ConsumerThread implements Runnable {
                 m_logger.error("Error Reading from Topic: {}; Exception: {}", item.topic(), e);
             }
 
+            int topicConsumerFailCount = 0;
             for (Integer key : response.keySet()) {
                 long elapsedTime = DEFAULT_ELAPSED_TIME;
                 try {
@@ -196,8 +197,11 @@ public class ConsumerThread implements Runnable {
                 } catch (InterruptedException | ExecutionException e) {
                     m_logger.error("Error Reading from Topic: {}; Partition: {}; Exception: {}", item.topic(), key, e);
                 }
-                if (elapsedTime >= DEFAULT_ELAPSED_TIME)
+                if (elapsedTime >= DEFAULT_ELAPSED_TIME) {
+                    m_logger.error("Exception or Timeout during consuming from [{},{}]", item.topic(), key);
+                    topicConsumerFailCount++;
                     consumerFailCount++;
+                }
                 MetricNameEncoded consumerPartitionLatency = new MetricNameEncoded("Consumer.Partition.Latency", item.topic() + "##" + key);
                 Histogram histogramConsumerPartitionLatency = new Histogram(new SlidingWindowReservoir(1));
                 if (!metrics.getNames().contains(new Gson().toJson(consumerPartitionLatency))) {
@@ -207,6 +211,13 @@ public class ConsumerThread implements Runnable {
                 histogramConsumerPartitionLatency.update(elapsedTime);
                 histogramConsumerTopicLatency.update(elapsedTime);
                 histogramConsumerLatency.update(elapsedTime);
+            }
+
+            if (appProperties.sendConsumerAvailability) {
+                MetricNameEncoded consumerAvailability = new MetricNameEncoded("Consumer.Availability", item.topic());
+                if (!metrics.getNames().contains(new Gson().toJson(consumerAvailability))) {
+                    metrics.register(new Gson().toJson(consumerAvailability), new AvailabilityGauge(response.keySet().size(), response.keySet().size() - topicConsumerFailCount));
+                }
             }
         }
 
