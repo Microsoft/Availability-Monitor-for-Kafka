@@ -14,13 +14,16 @@ public class AppProperties
     public String environmentName;
     public String sqlConnectionString;
     public boolean reportKafkaGTMAvailability;
+    public boolean reportKafkaIPAvailability;
     public List<String> kafkaGTMIP;
+    public List<String> kafkaIP;
     public boolean sendProducerAvailability;
     public boolean sendConsumerAvailability;
     public boolean sendProducerTopicAvailability;
     public boolean sendConsumerTopicAvailability;
     public boolean sendProducerLatency;
     public boolean sendGTMAvailabilityLatency;
+    public boolean sendKafkaIPAvailabilityLatency;
     public boolean sendConsumerLatency;
     public boolean sendProducerTopicLatency;
     public boolean sendConsumerTopicLatency;
@@ -33,4 +36,5 @@ public class AppProperties
     public int reportInterval;
     public long consumerPartitionTimeoutInSeconds;
     public long consumerTopicTimeoutInSeconds;
+    public long mainThreadsTimeoutInMinutes;
 }

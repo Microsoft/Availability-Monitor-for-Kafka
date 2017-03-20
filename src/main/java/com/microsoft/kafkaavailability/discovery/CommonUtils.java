@@ -10,6 +10,7 @@ import org.slf4j.LoggerFactory;
 
 import java.net.InetAddress;
 import java.util.HashSet;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Phaser;
 import java.util.concurrent.TimeUnit;
 import java.util.regex.Pattern;
@@ -126,5 +127,31 @@ public class CommonUtils {
      */
     public static Boolean isNullorEmptyorWhitespace(String obj) {
         return obj == null || obj.isEmpty() || obj.trim().isEmpty();
+    }
+
+
+    /**
+     * Stop new job from being submitted and wait termination.
+     * Taken from official documentation:
+     * http://docs.oracle.com/javase/7/docs/api/java/util/concurrent/ExecutorService.html
+     * @param pool the thread pool
+     */
+    public static void shutdownAndAwaitTermination(ExecutorService pool, String name) {
+        pool.shutdown(); // Disable new tasks from being submitted
+        try {
+            // Wait a while for existing tasks to terminate
+            if (!pool.awaitTermination(30, TimeUnit.SECONDS)) {
+                pool.shutdownNow(); // Cancel currently executing tasks
+                // Wait a while for tasks to respond to being cancelled
+                if (!pool.awaitTermination(30, TimeUnit.SECONDS))
+                    log.error("Pool did not terminate for the thread: {};", name);
+            }
+        } catch (InterruptedException ie) {
+            log.error("Error occured from {}; Exception: {}", name, ie);
+            // (Re-)Cancel if current thread also interrupted
+            pool.shutdownNow();
+            // Preserve interrupt status
+            Thread.currentThread().interrupt();
+        }
     }
 }

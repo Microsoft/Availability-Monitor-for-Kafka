@@ -2,7 +2,9 @@
   "environmentName": "localhost",
   "sqlConnectionString": "jdbc:sqlserver://test;DatabaseName=test;lockTimeout=30000;loginTimeout=30000;user=test;password=test",
   "reportKafkaGTMAvailability": true,
+  "reportKafkaIPAvailability": true,
   "kafkaGTMIP":["https://myTestEndpoint001.trafficmanager.net?topic=","https://myTestEndpoint002.trafficmanager.net?topic="],
+  "kafkaIP":["https://myTestEndpointVIP003.trafficmanager.net?topic=","https://myTestEndpointVIP004.trafficmanager.net?topic="],
   "sendProducerAvailability": true,
   "sendConsumerAvailability": true,
   "sendProducerTopicAvailability": true,
@@ -10,6 +12,7 @@
   "sendProducerLatency": true,
   "sendConsumerLatency": true,
   "sendGTMAvailabilityLatency": true,
+  "sendKafkaIPAvailabilityLatency": true,
   "sendProducerTopicLatency": true,
   "sendConsumerTopicLatency": true,
   "sendProducerPartitionLatency": true,
@@ -19,5 +22,6 @@
   "producerThreadSleepTime": 60000,
   "reportInterval": 0,
   "consumerPartitionTimeoutInSeconds": 30,
-  "consumerTopicTimeoutInSeconds": 60
+  "consumerTopicTimeoutInSeconds": 60,
+  "mainThreadsTimeoutInMinutes": 900000
 }

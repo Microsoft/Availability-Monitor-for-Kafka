@@ -30,7 +30,7 @@ import java.util.concurrent.*;
 
 import static com.microsoft.kafkaavailability.discovery.Constants.DEFAULT_ELAPSED_TIME;
 
-public class ConsumerThread implements Runnable {
+public class ConsumerThread implements Callable<Long> {
 
     final static Logger m_logger = LoggerFactory.getLogger(ConsumerThread.class);
     Phaser m_phaser;
@@ -53,8 +53,9 @@ public class ConsumerThread implements Runnable {
     }
 
     @Override
-    public void run() {
+    public Long call() throws Exception {
         int sleepDuration = 1000;
+        long elapsedTime = 0L;
         do {
             long lStartTime = System.nanoTime();
             MetricRegistry metrics;
@@ -80,7 +81,7 @@ public class ConsumerThread implements Runnable {
                     m_logger.error(e.getMessage(), e);
                 }
             }
-            long elapsedTime = CommonUtils.stopWatch(lStartTime);
+            elapsedTime = CommonUtils.stopWatch(lStartTime);
             m_logger.info("Consumer Elapsed: " + elapsedTime + " milliseconds.");
 
             while (elapsedTime < m_threadSleepTime && !m_phaser.isTerminated()) {
@@ -97,6 +98,7 @@ public class ConsumerThread implements Runnable {
 
         } while (!m_phaser.isTerminated());
         m_logger.info("ConsumerThread (run()) has been COMPLETED.");
+        return Long.valueOf(elapsedTime);
     }
 
     private void RunConsumer(MetricRegistry metrics) throws IOException, MetaDataManagerException {
@@ -123,11 +125,24 @@ public class ConsumerThread implements Runnable {
         List<kafka.javaapi.TopicMetadata> totalTopicMetadata = metaDataManager.getAllTopicPartition();
         List<kafka.javaapi.TopicMetadata> allTopicMetadata = new ArrayList<kafka.javaapi.TopicMetadata>();
 
+        String sep = ", ";
+        StringBuilder rString = new StringBuilder();
+
         for (kafka.javaapi.TopicMetadata topic : totalTopicMetadata) {
-            if ((totalTopicMetadata.indexOf(topic) % m_listServers.size()) == m_listServers.indexOf(m_serviceSpec)) {
+            //Log the server/topic mapping to know which topic is getting  by which instance of KAT-List<String>
+            int topicPosition = -1;
+            String client = "";
+            int serverIndex = -1;
+            topicPosition = totalTopicMetadata.indexOf(topic);
+            serverIndex = (totalTopicMetadata.indexOf(topic) % m_listServers.size());
+            client = m_listServers.get(serverIndex);
+
+            if (serverIndex == m_listServers.indexOf(m_serviceSpec)) {
                 allTopicMetadata.add(topic);
             }
+            rString.append(sep).append(topic.topic() + "-->" + client);
         }
+        m_logger.info("Mapping of topics and servers:" + rString);
 
         m_logger.info("totalTopicMetadata size:" + totalTopicMetadata.size());
         m_logger.info("allTopicMetadata size in Consumer:" + allTopicMetadata.size());
@@ -174,7 +189,7 @@ public class ConsumerThread implements Runnable {
                 ConsumerPartitionThread consumerPartitionJob = new ConsumerPartitionThread(m_curatorFramework, item, part);
 
                 //submit Callable tasks to be executed by thread pool
-                Future<Long> future = newFixedThreadPool.submit(new JobManager(consumerPartitionTimeoutInSeconds, TimeUnit.SECONDS, consumerPartitionJob));
+                Future<Long> future = newFixedThreadPool.submit(new JobManager(consumerPartitionTimeoutInSeconds, TimeUnit.SECONDS, consumerPartitionJob, "Consumer-" + item.topic() + "-P#" + part.partitionId()));
 
                 //add Future to the list, we can get return value using Future
                 //futures.add(future);
@@ -183,14 +198,7 @@ public class ConsumerThread implements Runnable {
 
             //shut down the executor service now. This will make the executor accept no new threads
             // and finish all existing threads in the queue
-            newFixedThreadPool.shutdown();
-
-            try {
-                // Wait until all threads are finish
-                newFixedThreadPool.awaitTermination(consumerTopicTimeoutInSeconds, TimeUnit.SECONDS); //Global Timeout
-            } catch (InterruptedException e) {
-                m_logger.error("Error Reading from Topic: {}; Exception: {}", item.topic(), e);
-            }
+            CommonUtils.shutdownAndAwaitTermination(newFixedThreadPool, item.topic());
 
             int topicConsumerFailCount = 0;
             for (Integer key : response.keySet()) {

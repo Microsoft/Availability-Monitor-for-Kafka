@@ -14,8 +14,9 @@ import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.util.concurrent.Phaser;
+import java.util.concurrent.*;
 
-public class LeaderInfoThread implements Runnable {
+public class LeaderInfoThread implements Callable<Long> {
 
     final static Logger m_logger = LoggerFactory.getLogger(LeaderInfoThread.class);
     Phaser m_phaser;
@@ -31,8 +32,9 @@ public class LeaderInfoThread implements Runnable {
     }
 
     @Override
-    public void run() {
+    public Long call() throws Exception {
         int sleepDuration = 1000;
+        long elapsedTime = 0L;
 
         do {
             m_logger.info(Thread.currentThread().getName() +
@@ -45,7 +47,7 @@ public class LeaderInfoThread implements Runnable {
             } catch (Exception e) {
                 m_logger.error(e.getMessage(), e);
             }
-            long elapsedTime = CommonUtils.stopWatch(lStartTime);
+            elapsedTime = CommonUtils.stopWatch(lStartTime);
             m_logger.info("LeaderInfo Elapsed: " + elapsedTime + " milliseconds.");
 
             while (elapsedTime < m_threadSleepTime && !m_phaser.isTerminated()) {
@@ -61,6 +63,7 @@ public class LeaderInfoThread implements Runnable {
             //CommonUtils.dumpPhaserState("After arrival of LeaderInfoThread", m_phaser);
         } while (!m_phaser.isTerminated());
         m_logger.info("LeaderInfoThread (run()) has been COMPLETED.");
+        return Long.valueOf(elapsedTime);
     }
 
     private void RunLeaderInfo() throws IOException, MetaDataManagerException {

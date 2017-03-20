@@ -25,11 +25,12 @@ import org.slf4j.LoggerFactory;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.*;
 import java.util.concurrent.Phaser;
 
 import static com.microsoft.kafkaavailability.discovery.Constants.DEFAULT_ELAPSED_TIME;
 
-public class ProducerThread implements Runnable {
+public class ProducerThread implements Callable<Long> {
 
     final static Logger m_logger = LoggerFactory.getLogger(ProducerThread.class);
     Phaser m_phaser;
@@ -48,8 +49,9 @@ public class ProducerThread implements Runnable {
     }
 
     @Override
-    public void run() {
+    public Long call() throws Exception {
         int sleepDuration = 1000;
+        long elapsedTime = 0L;
 
         do {
             long lStartTime = System.nanoTime();
@@ -77,7 +79,7 @@ public class ProducerThread implements Runnable {
                 }
             }
 
-            long elapsedTime = CommonUtils.stopWatch(lStartTime);
+            elapsedTime = CommonUtils.stopWatch(lStartTime);
             m_logger.info("Producer Elapsed: " + elapsedTime + " milliseconds.");
 
             while (elapsedTime < m_threadSleepTime && !m_phaser.isTerminated()) {
@@ -91,6 +93,7 @@ public class ProducerThread implements Runnable {
             //phaser.arriveAndAwaitAdvance();
         } while (!m_phaser.isTerminated());
         m_logger.info("ProducerThread (run()) has been COMPLETED.");
+        return Long.valueOf(elapsedTime);
     }
 
     private void RunProducer(MetricRegistry metrics) throws IOException, MetaDataManagerException {

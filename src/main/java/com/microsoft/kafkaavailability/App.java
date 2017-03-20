@@ -5,16 +5,14 @@
 
 package com.microsoft.kafkaavailability;
 
+import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import com.microsoft.kafkaavailability.discovery.CommonUtils;
 import com.microsoft.kafkaavailability.discovery.Constants;
 import com.microsoft.kafkaavailability.discovery.CuratorClient;
 import com.microsoft.kafkaavailability.discovery.CuratorManager;
 import com.microsoft.kafkaavailability.properties.AppProperties;
 import com.microsoft.kafkaavailability.properties.MetaDataManagerProperties;
-import com.microsoft.kafkaavailability.threads.AvailabilityThread;
-import com.microsoft.kafkaavailability.threads.ConsumerThread;
-import com.microsoft.kafkaavailability.threads.LeaderInfoThread;
-import com.microsoft.kafkaavailability.threads.ProducerThread;
+import com.microsoft.kafkaavailability.threads.*;
 import org.apache.commons.cli.*;
 import org.apache.curator.framework.CuratorFramework;
 import org.apache.curator.framework.imps.CuratorFrameworkState;
@@ -23,9 +21,12 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.concurrent.*;
 import java.util.concurrent.Phaser;
+import java.util.concurrent.TimeUnit;
 
 /***
  * Sends a canary message to every topic and partition in Kafka.
@@ -135,6 +136,9 @@ public class App {
         } catch (Exception e) {
             m_logger.error(e.getMessage(), e);
         }
+
+        HeartBeat beat = new HeartBeat(appProperties.environmentName);
+        beat.start();
         return curatorManager;
     }
 
@@ -159,22 +163,20 @@ public class App {
         /** The phaser is a nice synchronization barrier. */
         final Phaser phaser = new Phaser(1) {
             /**
-             *
              * Every time before advancing to next phase overridden
              * onAdvance() method is called and returns either true or false.
              * onAdvance() is invoked when all threads reached the synchronization barrier. It returns true if the
              * phaser should terminate, false if phaser should continue with next phase. When terminated: (1) attempts
              * to register new parties have no effect and (2) synchronization methods immediately return without waiting
              * for advance. When continue:
-             *
+             * <p>
              * <pre>
              *       -> set unarrived parties = registered parties
              *       -> set arrived parties = 0
              *       -> set phase = phase + 1
              * </pre>
-             *
+             * <p>
              * This causes another iteration for all thread parties in a new phase (cycle).
-             *
              */
             protected boolean onAdvance(int phase, int registeredParties) {
                 m_logger.info("onAdvance() method" + " -> Registered: " + getRegisteredParties() + " - Unarrived: "
@@ -206,16 +208,28 @@ public class App {
         //default to 5 minutes, if not configured
         long consumerThreadSleepTime = (appProperties.consumerThreadSleepTime > 0 ? appProperties.consumerThreadSleepTime : 300000);
 
-        Thread leaderInfoThread = new Thread(new LeaderInfoThread(phaser, curatorFramework, leaderInfoThreadSleepTime), "LeaderInfoThread-1");
+        //default to 15 minutes, if not configured
+        long mainThreadsTimeoutInMinutes = (appProperties.consumerThreadSleepTime > 0 ? appProperties.consumerThreadSleepTime : 900000);
 
-        Thread producerThread = new Thread(new ProducerThread(phaser, curatorFramework, producerThreadSleepTime, appProperties.environmentName), "ProducerThread-1");
-        Thread availabilityThread = new Thread(new AvailabilityThread(phaser, curatorFramework, availabilityThreadSleepTime, appProperties.environmentName), "AvailabilityThread-1");
-        Thread consumerThread = new Thread(new ConsumerThread(phaser, curatorFramework, listServers, serviceSpec, appProperties.environmentName, consumerThreadSleepTime), "ConsumerThread-1");
+        ExecutorService service = Executors.newFixedThreadPool(4, new
+                ThreadFactoryBuilder().setNameFormat("Main-ExecutorService-Thread")
+                .build());
 
-        leaderInfoThread.start();
-        producerThread.start();
-        availabilityThread.start();
-        consumerThread.start();
+        /*
+        Adding the thread timeout to make sure, we never end up with long running thread which are never finishing.
+
+        ConsumerThread usually takes longer to finish as it has to initiate multiple child threads for consuming data from each topic and partition.
+        Adding one extra minute to other threads so that they can finish the current execution (they perform same operation multiple times) otherwise they may also get get interupted.
+         */
+        JobManager LeaderInfoJob = new JobManager(mainThreadsTimeoutInMinutes + 5, TimeUnit.MINUTES, new LeaderInfoThread(phaser, curatorFramework, leaderInfoThreadSleepTime), "LeaderInfoThread");
+        JobManager ProducerJob = new JobManager(mainThreadsTimeoutInMinutes + 5, TimeUnit.MINUTES, new ProducerThread(phaser, curatorFramework, producerThreadSleepTime, appProperties.environmentName), "ProducerThread");
+        JobManager AvailabilityJob = new JobManager(mainThreadsTimeoutInMinutes + 5, TimeUnit.MINUTES, new AvailabilityThread(phaser, curatorFramework, availabilityThreadSleepTime, appProperties.environmentName), "AvailabilityThread");
+        JobManager ConsumerJob = new JobManager(mainThreadsTimeoutInMinutes, TimeUnit.MINUTES, new ConsumerThread(phaser, curatorFramework, listServers, serviceSpec, appProperties.environmentName, consumerThreadSleepTime), "ConsumerThread");
+
+        service.submit(LeaderInfoJob);
+        service.submit(ProducerJob);
+        service.submit(AvailabilityJob);
+        service.submit(ConsumerJob);
 
         CommonUtils.dumpPhaserState("Before main thread arrives and deregisters", phaser);
         //Wait for the consumer thread to finish, Rest other thread keep running while the consumer thread is executing.
@@ -229,6 +243,10 @@ public class App {
             phaser.arriveAndAwaitAdvance();
             m_logger.info("------Phase-" + currentPhase + " has been COMPLETED----------");
         }
+
+        //shut down the executor service now. This will make the executor accept no new threads
+        // and finish all existing threads in the queue
+        CommonUtils.shutdownAndAwaitTermination(service, "Main-ExecutorService-Thread");
 
         /**
          * When the final party for a given phase arrives, onAdvance() is invoked and the phase advances. The
