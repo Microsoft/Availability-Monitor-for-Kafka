@@ -136,9 +136,7 @@ public class App {
         } catch (Exception e) {
             m_logger.error(e.getMessage(), e);
         }
-
-        HeartBeat beat = new HeartBeat(appProperties.environmentName);
-        beat.start();
+        
         return curatorManager;
     }
 
@@ -159,6 +157,9 @@ public class App {
     }
 
     private static void RunOnce(CuratorFramework curatorFramework) throws IOException, MetaDataManagerException {
+
+        HeartBeat beat = new HeartBeat(appProperties.environmentName);
+        beat.start();
 
         /** The phaser is a nice synchronization barrier. */
         final Phaser phaser = new Phaser(1) {
@@ -261,7 +262,7 @@ public class App {
         // deregistering the main thread
         phaser.arriveAndDeregister();
         //CommonUtils.dumpPhaserState("After main thread arrived and deregistered", phaser);
-
+        beat.stop();
         m_logger.info("All Finished.");
     }
 }
