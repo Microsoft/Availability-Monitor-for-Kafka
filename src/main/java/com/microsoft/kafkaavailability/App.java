@@ -209,7 +209,7 @@ public class App {
         long consumerThreadSleepTime = (appProperties.consumerThreadSleepTime > 0 ? appProperties.consumerThreadSleepTime : 300000);
 
         //default to 15 minutes, if not configured
-        long mainThreadsTimeoutInMinutes = (appProperties.consumerThreadSleepTime > 0 ? appProperties.consumerThreadSleepTime : 900000);
+        long mainThreadsTimeoutInMinutes = (appProperties.mainThreadsTimeoutInMinutes > 0 ? appProperties.mainThreadsTimeoutInMinutes : 900000);
 
         ExecutorService service = Executors.newFixedThreadPool(4, new
                 ThreadFactoryBuilder().setNameFormat("Main-ExecutorService-Thread")
