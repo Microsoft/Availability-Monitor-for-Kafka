@@ -5,11 +5,13 @@
 
 package com.microsoft.kafkaavailability;
 
-import java.io.IOException;
+import kafka.javaapi.TopicMetadata;
 
-public interface IProducer
-{
-    void SendCanaryToTopicPartition(String topicName, String partitionId);
-    void SendCanaryToKafkaIP(String kafkaIP, String topicName, boolean enableCertCheck) throws Exception;
-    void close() throws IOException;
+import java.util.Comparator;
+
+public class TopicMetadataComparator implements Comparator<TopicMetadata> {
+    @Override
+    public int compare(TopicMetadata t1, TopicMetadata t2) {
+        return (t1.topic()).compareToIgnoreCase((t2.topic()));
+    }
 }

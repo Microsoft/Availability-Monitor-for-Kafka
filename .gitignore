@@ -1,0 +1,8 @@
+
+#ignore user settings
+.idea/libraries/*.xml
+.idea/copyright/profiles_settings.xml 
+.idea/*.xml
+
+kafkaavailability.iml 
+src/.idea/*

@@ -12,5 +12,7 @@ public interface IMetaDataManager
     List<String> getBrokerList(boolean addPort) throws MetaDataManagerException;
     List<kafka.javaapi.TopicMetadata> getMetaDataFromAllBrokers();
     List<kafka.javaapi.TopicMetadata> getAllTopicPartition();
+    void createTopicIfNotExist(String topicName, int partitions, int replicationFactor);
+    void createCanaryTopics();
     void printEverything();
 }

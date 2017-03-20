@@ -7,23 +7,34 @@
  */
 package com.microsoft.kafkaavailability.properties;
 
+import java.util.List;
+
 public class AppProperties
 {
+    public String environmentName;
     public String sqlConnectionString;
+    public boolean reportKafkaGTMAvailability;
     public boolean reportKafkaIPAvailability;
-    public String kafkaIP;
-    public boolean reportToSql;
-    public boolean reportToSlf4j;
-    public boolean reportToConsole;
-    public boolean reportToCsv;
-    public boolean reportToJmx;
+    public List<String> kafkaGTMIP;
+    public List<String> kafkaIP;
     public boolean sendProducerAvailability;
     public boolean sendConsumerAvailability;
+    public boolean sendProducerTopicAvailability;
+    public boolean sendConsumerTopicAvailability;
     public boolean sendProducerLatency;
+    public boolean sendGTMAvailabilityLatency;
+    public boolean sendKafkaIPAvailabilityLatency;
     public boolean sendConsumerLatency;
     public boolean sendProducerTopicLatency;
     public boolean sendConsumerTopicLatency;
     public boolean sendProducerPartitionLatency;
     public boolean sendConsumerPartitionLatency;
-    public String csvDirectory;
+    public long producerThreadSleepTime;
+    public long consumerThreadSleepTime;
+    public long leaderInfoThreadSleepTime;
+    public long availabilityThreadSleepTime;
+    public int reportInterval;
+    public long consumerPartitionTimeoutInSeconds;
+    public long consumerTopicTimeoutInSeconds;
+    public long mainThreadsTimeoutInMinutes;
 }
