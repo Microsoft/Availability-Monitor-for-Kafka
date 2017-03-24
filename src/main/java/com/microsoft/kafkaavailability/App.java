@@ -137,7 +137,9 @@ public class App {
             m_logger.error(e.getMessage(), e);
         }
 
-        HeartBeat beat = new HeartBeat(appProperties.environmentName);
+        //default to 1 minute, if not configured
+        long heartBeatIntervalInSeconds = (appProperties.heartBeatIntervalInSeconds > 0 ? appProperties.heartBeatIntervalInSeconds : 60000);
+        HeartBeat beat = new HeartBeat(appProperties.environmentName, heartBeatIntervalInSeconds);
         beat.start();
         return curatorManager;
     }
@@ -208,8 +210,8 @@ public class App {
         //default to 5 minutes, if not configured
         long consumerThreadSleepTime = (appProperties.consumerThreadSleepTime > 0 ? appProperties.consumerThreadSleepTime : 300000);
 
-        //default to 15 minutes, if not configured
-        long mainThreadsTimeoutInMinutes = (appProperties.consumerThreadSleepTime > 0 ? appProperties.consumerThreadSleepTime : 900000);
+        //default to 10 minutes, if not configured
+        long mainThreadsTimeoutInSeconds = (appProperties.mainThreadsTimeoutInSeconds > 0 ? appProperties.mainThreadsTimeoutInSeconds : 600000);
 
         ExecutorService service = Executors.newFixedThreadPool(4, new
                 ThreadFactoryBuilder().setNameFormat("Main-ExecutorService-Thread")
@@ -221,10 +223,10 @@ public class App {
         ConsumerThread usually takes longer to finish as it has to initiate multiple child threads for consuming data from each topic and partition.
         Adding one extra minute to other threads so that they can finish the current execution (they perform same operation multiple times) otherwise they may also get get interupted.
          */
-        JobManager LeaderInfoJob = new JobManager(mainThreadsTimeoutInMinutes + 5, TimeUnit.MINUTES, new LeaderInfoThread(phaser, curatorFramework, leaderInfoThreadSleepTime), "LeaderInfoThread");
-        JobManager ProducerJob = new JobManager(mainThreadsTimeoutInMinutes + 5, TimeUnit.MINUTES, new ProducerThread(phaser, curatorFramework, producerThreadSleepTime, appProperties.environmentName), "ProducerThread");
-        JobManager AvailabilityJob = new JobManager(mainThreadsTimeoutInMinutes + 5, TimeUnit.MINUTES, new AvailabilityThread(phaser, curatorFramework, availabilityThreadSleepTime, appProperties.environmentName), "AvailabilityThread");
-        JobManager ConsumerJob = new JobManager(mainThreadsTimeoutInMinutes, TimeUnit.MINUTES, new ConsumerThread(phaser, curatorFramework, listServers, serviceSpec, appProperties.environmentName, consumerThreadSleepTime), "ConsumerThread");
+        JobManager LeaderInfoJob = new JobManager(mainThreadsTimeoutInSeconds , TimeUnit.SECONDS, new LeaderInfoThread(phaser, curatorFramework, leaderInfoThreadSleepTime), "LeaderInfoThread");
+        JobManager ProducerJob = new JobManager(mainThreadsTimeoutInSeconds , TimeUnit.SECONDS, new ProducerThread(phaser, curatorFramework, producerThreadSleepTime, appProperties.environmentName), "ProducerThread");
+        JobManager AvailabilityJob = new JobManager(mainThreadsTimeoutInSeconds , TimeUnit.SECONDS, new AvailabilityThread(phaser, curatorFramework, availabilityThreadSleepTime, appProperties.environmentName), "AvailabilityThread");
+        JobManager ConsumerJob = new JobManager(mainThreadsTimeoutInSeconds, TimeUnit.SECONDS, new ConsumerThread(phaser, curatorFramework, listServers, serviceSpec, appProperties.environmentName, consumerThreadSleepTime), "ConsumerThread");
 
         service.submit(LeaderInfoJob);
         service.submit(ProducerJob);
@@ -232,16 +234,29 @@ public class App {
         service.submit(ConsumerJob);
 
         CommonUtils.dumpPhaserState("Before main thread arrives and deregisters", phaser);
-        //Wait for the consumer thread to finish, Rest other thread keep running while the consumer thread is executing.
+        //Wait for the consumer thread to finish, Rest other threads can keep running multiple times, while the consumer thread is executing.
         while (!phaser.isTerminated()) {
-            //get current phase
-            int currentPhase = phaser.getPhase();
                   /*arriveAndAwaitAdvance() will cause thread to wait until current phase
                    * has been completed i.e. until all registered threads
                    * call arriveAndAwaitAdvance()
                    */
             phaser.arriveAndAwaitAdvance();
-            m_logger.info("------Phase-" + currentPhase + " has been COMPLETED----------");
+
+            try {
+                /*
+                * arriveAndDeregister deregisters reduces the number of arrived parties
+                * arriveAndDeregister() throws IllegalStateException if number of
+                * registered or unarrived parties would become negative
+                * Calling arriveAndDeregister, just in case the thread had an exception(timeout configured in job manager call) but phaser is still not arrived.
+                * */
+                phaser.arriveAndDeregister();
+
+                /*
+                * arrive() returns a negative number if the Phaser is terminated
+                 */
+                phaser.forceTermination();
+            } catch (IllegalStateException success) {
+            }
         }
 
         //shut down the executor service now. This will make the executor accept no new threads

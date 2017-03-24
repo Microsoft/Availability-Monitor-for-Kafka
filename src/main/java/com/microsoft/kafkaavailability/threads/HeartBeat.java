@@ -23,11 +23,13 @@ public class HeartBeat {
 
     private final String serverName;
     private final String clusterName;
+    private final long heartBeatIntervalInSeconds;
     final static Logger logger = LoggerFactory.getLogger(HeartBeat.class);
 
-    public HeartBeat(String clusterName) {
+    public HeartBeat(String clusterName, long heartBeatIntervalInSeconds) {
         serverName = CommonUtils.getComputerName();
         this.clusterName = clusterName;
+        this.heartBeatIntervalInSeconds = heartBeatIntervalInSeconds;
     }
 
     public void start() {
@@ -35,9 +37,9 @@ public class HeartBeat {
         scheduler = Executors.newSingleThreadScheduledExecutor(new
                 ThreadFactoryBuilder().setNameFormat("HeartBeat-Thread")
                 .build());
-        logger.info(String.format("Starting heartbeat for %s", serverName));
+        logger.info(String.format("Starting heartbeat for %s to run every %d seconds with a zero-second delay time", serverName, heartBeatIntervalInSeconds));
 
-        scheduler.scheduleAtFixedRate(new HeartBeatThread(clusterName, serverName), 0L, 60, TimeUnit.SECONDS);
+        scheduler.scheduleAtFixedRate(new HeartBeatThread(clusterName, serverName), 0L, heartBeatIntervalInSeconds, TimeUnit.SECONDS);
     }
 
     public void stop() {

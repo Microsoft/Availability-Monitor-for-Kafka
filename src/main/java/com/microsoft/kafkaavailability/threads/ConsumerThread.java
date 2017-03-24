@@ -56,47 +56,37 @@ public class ConsumerThread implements Callable<Long> {
     public Long call() throws Exception {
         int sleepDuration = 1000;
         long elapsedTime = 0L;
-        do {
-            long lStartTime = System.nanoTime();
-            MetricRegistry metrics;
-            m_logger.info(Thread.currentThread().getName() +
-                    " - Consumer party has arrived and is working in "
-                    + "Phase-" + m_phaser.getPhase());
+        long lStartTime = System.nanoTime();
+        MetricRegistry metrics;
+        m_logger.info(Thread.currentThread().getName() +
+                " - Consumer party has arrived and is working in "
+                + "Phase-" + m_phaser.getPhase());
 
+        try {
+            metricsFactory = new MetricsFactory();
+            metricsFactory.configure(m_clusterName);
+
+            metricsFactory.start();
+            metrics = metricsFactory.getRegistry();
+            RunConsumer(metrics);
+
+        } catch (Exception e) {
+            m_logger.error(e.getMessage(), e);
+            m_phaser.arriveAndDeregister();
+        } finally {
             try {
-                metricsFactory = new MetricsFactory();
-                metricsFactory.configure(m_clusterName);
-
-                metricsFactory.start();
-                metrics = metricsFactory.getRegistry();
-                RunConsumer(metrics);
                 metricsFactory.report();
                 CommonUtils.sleep(1000);
+                metricsFactory.stop();
             } catch (Exception e) {
                 m_logger.error(e.getMessage(), e);
-            } finally {
-                try {
-                    metricsFactory.stop();
-                } catch (Exception e) {
-                    m_logger.error(e.getMessage(), e);
-                }
             }
-            elapsedTime = CommonUtils.stopWatch(lStartTime);
-            m_logger.info("Consumer Elapsed: " + elapsedTime + " milliseconds.");
+        }
+        elapsedTime = CommonUtils.stopWatch(lStartTime);
+        m_logger.info("Consumer Elapsed: " + elapsedTime + " milliseconds.");
 
-            while (elapsedTime < m_threadSleepTime && !m_phaser.isTerminated()) {
-                try {
-                    Thread.currentThread().sleep(sleepDuration);
-                    elapsedTime = elapsedTime + sleepDuration;
-                } catch (InterruptedException ie) {
-                    m_logger.error(ie.getMessage(), ie);
-                }
-            }
-
-            m_phaser.arriveAndDeregister();
-            CommonUtils.dumpPhaserState("After arrival of ConsumerThread", m_phaser);
-
-        } while (!m_phaser.isTerminated());
+        m_phaser.arriveAndDeregister();
+        CommonUtils.dumpPhaserState("After arrival of ConsumerThread", m_phaser);
         m_logger.info("ConsumerThread (run()) has been COMPLETED.");
         return Long.valueOf(elapsedTime);
     }

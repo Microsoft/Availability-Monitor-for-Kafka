@@ -40,8 +40,10 @@ public class JobManager implements Callable<Long> {
             if (e instanceof TimeoutException) {
                 m_logger.error("Thread Timeout of " + timeout + " " + timeUnit + " occurred for " + job.toString() + " Cancelling the thread:" + threadName);
             } else {
-                m_logger.error("Exception occurred for " + job.toString() + " : " + e.getMessage());
+                m_logger.error("Exception occurred for " + job.toString() + " : " + e);
             }
+        } catch (Exception e) {
+            m_logger.error("Unexpected exception occurred for " + job.toString() + " : " + e);
         } finally {
             future.cancel(true);
             CommonUtils.shutdownAndAwaitTermination(executorService, job.toString());
