@@ -36,5 +36,5 @@ public class AppProperties
     public int reportInterval;
     public long consumerPartitionTimeoutInSeconds;
     public long consumerTopicTimeoutInSeconds;
-    public long mainThreadsTimeoutInMinutes;
+    public long mainThreadsTimeoutInSeconds;
 }

@@ -210,7 +210,7 @@ public class App {
         long consumerThreadSleepTime = (appProperties.consumerThreadSleepTime > 0 ? appProperties.consumerThreadSleepTime : 300000);
 
         //default to 15 minutes, if not configured
-        long mainThreadsTimeoutInMinutes = (appProperties.mainThreadsTimeoutInMinutes > 0 ? appProperties.mainThreadsTimeoutInMinutes : 900000);
+        long mainThreadsTimeoutInSeconds = (appProperties.mainThreadsTimeoutInSeconds > 0 ? appProperties.mainThreadsTimeoutInSeconds : 900000);
 
         ExecutorService service = Executors.newFixedThreadPool(4, new
                 ThreadFactoryBuilder().setNameFormat("Main-ExecutorService-Thread")
@@ -222,10 +222,10 @@ public class App {
         ConsumerThread usually takes longer to finish as it has to initiate multiple child threads for consuming data from each topic and partition.
         Adding one extra minute to other threads so that they can finish the current execution (they perform same operation multiple times) otherwise they may also get get interupted.
          */
-        JobManager LeaderInfoJob = new JobManager(mainThreadsTimeoutInMinutes + 5, TimeUnit.MINUTES, new LeaderInfoThread(phaser, curatorFramework, leaderInfoThreadSleepTime), "LeaderInfoThread");
-        JobManager ProducerJob = new JobManager(mainThreadsTimeoutInMinutes + 5, TimeUnit.MINUTES, new ProducerThread(phaser, curatorFramework, producerThreadSleepTime, appProperties.environmentName), "ProducerThread");
-        JobManager AvailabilityJob = new JobManager(mainThreadsTimeoutInMinutes + 5, TimeUnit.MINUTES, new AvailabilityThread(phaser, curatorFramework, availabilityThreadSleepTime, appProperties.environmentName), "AvailabilityThread");
-        JobManager ConsumerJob = new JobManager(mainThreadsTimeoutInMinutes, TimeUnit.MINUTES, new ConsumerThread(phaser, curatorFramework, listServers, serviceSpec, appProperties.environmentName, consumerThreadSleepTime), "ConsumerThread");
+        JobManager LeaderInfoJob = new JobManager(mainThreadsTimeoutInSeconds + 60, TimeUnit.SECONDS, new LeaderInfoThread(phaser, curatorFramework, leaderInfoThreadSleepTime), "LeaderInfoThread");
+        JobManager ProducerJob = new JobManager(mainThreadsTimeoutInSeconds + 60, TimeUnit.SECONDS, new ProducerThread(phaser, curatorFramework, producerThreadSleepTime, appProperties.environmentName), "ProducerThread");
+        JobManager AvailabilityJob = new JobManager(mainThreadsTimeoutInSeconds + 60, TimeUnit.SECONDS, new AvailabilityThread(phaser, curatorFramework, availabilityThreadSleepTime, appProperties.environmentName), "AvailabilityThread");
+        JobManager ConsumerJob = new JobManager(mainThreadsTimeoutInSeconds, TimeUnit.SECONDS, new ConsumerThread(phaser, curatorFramework, listServers, serviceSpec, appProperties.environmentName, consumerThreadSleepTime), "ConsumerThread");
 
         service.submit(LeaderInfoJob);
         service.submit(ProducerJob);

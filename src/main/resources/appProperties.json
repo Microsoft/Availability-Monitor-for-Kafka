@@ -23,5 +23,5 @@
   "reportInterval": 0,
   "consumerPartitionTimeoutInSeconds": 30,
   "consumerTopicTimeoutInSeconds": 60,
-  "mainThreadsTimeoutInMinutes": 900000
+  "mainThreadsTimeoutInSeconds": 900000
 }
