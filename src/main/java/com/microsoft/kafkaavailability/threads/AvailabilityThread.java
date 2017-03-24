@@ -54,7 +54,7 @@ public class AvailabilityThread implements Callable<Long> {
         int sleepDuration = 1000;
         long elapsedTime = 0L;
         do {
-            long lStartTime = System.nanoTime();
+            long lStartTime = System.currentTimeMillis();
             MetricRegistry metrics;
             m_logger.info(Thread.currentThread().getName() +
                     " - Availability party has arrived and is working in "

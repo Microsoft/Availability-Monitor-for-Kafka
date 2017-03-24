@@ -40,7 +40,7 @@ public class LeaderInfoThread implements Callable<Long> {
             m_logger.info(Thread.currentThread().getName() +
                     " - LeaderInfo party has arrived and is working in "
                     + "Phase-" + m_phaser.getPhase());
-            long lStartTime = System.nanoTime();
+            long lStartTime = System.currentTimeMillis();
 
             try {
                 RunLeaderInfo();

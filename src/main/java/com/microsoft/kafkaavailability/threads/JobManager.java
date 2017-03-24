@@ -44,6 +44,7 @@ public class JobManager implements Callable<Long> {
             }
         } catch (Exception e) {
             m_logger.error("Unexpected exception occurred for " + job.toString() + " : " + e);
+
         } finally {
             future.cancel(true);
             CommonUtils.shutdownAndAwaitTermination(executorService, job.toString());

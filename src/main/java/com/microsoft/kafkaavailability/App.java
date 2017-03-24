@@ -137,10 +137,6 @@ public class App {
             m_logger.error(e.getMessage(), e);
         }
 
-        //default to 1 minute, if not configured
-        long heartBeatIntervalInSeconds = (appProperties.heartBeatIntervalInSeconds > 0 ? appProperties.heartBeatIntervalInSeconds : 60000);
-        HeartBeat beat = new HeartBeat(appProperties.environmentName, heartBeatIntervalInSeconds);
-        beat.start();
         return curatorManager;
     }
 
@@ -161,6 +157,11 @@ public class App {
     }
 
     private static void RunOnce(CuratorFramework curatorFramework) throws IOException, MetaDataManagerException {
+
+        //default to 1 minute, if not configured
+        long heartBeatIntervalInSeconds = (appProperties.heartBeatIntervalInSeconds > 0 ? appProperties.heartBeatIntervalInSeconds : 60);
+        HeartBeat beat = new HeartBeat(appProperties.environmentName, heartBeatIntervalInSeconds);
+        beat.start();
 
         /** The phaser is a nice synchronization barrier. */
         final Phaser phaser = new Phaser(1) {
@@ -211,7 +212,7 @@ public class App {
         long consumerThreadSleepTime = (appProperties.consumerThreadSleepTime > 0 ? appProperties.consumerThreadSleepTime : 300000);
 
         //default to 10 minutes, if not configured
-        long mainThreadsTimeoutInSeconds = (appProperties.mainThreadsTimeoutInSeconds > 0 ? appProperties.mainThreadsTimeoutInSeconds : 600000);
+        long mainThreadsTimeoutInSeconds = (appProperties.mainThreadsTimeoutInSeconds > 0 ? appProperties.mainThreadsTimeoutInSeconds : 60);
 
         ExecutorService service = Executors.newFixedThreadPool(4, new
                 ThreadFactoryBuilder().setNameFormat("Main-ExecutorService-Thread")
@@ -255,7 +256,7 @@ public class App {
                 * arrive() returns a negative number if the Phaser is terminated
                  */
                 phaser.forceTermination();
-            } catch (IllegalStateException success) {
+            } catch (IllegalStateException exception) {
             }
         }
 
@@ -277,6 +278,7 @@ public class App {
         phaser.arriveAndDeregister();
         //CommonUtils.dumpPhaserState("After main thread arrived and deregistered", phaser);
 
+        beat.stop();
         m_logger.info("All Finished.");
     }
 }

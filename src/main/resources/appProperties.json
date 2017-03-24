@@ -23,6 +23,6 @@
   "reportInterval": 0,
   "consumerPartitionTimeoutInSeconds": 30,
   "consumerTopicTimeoutInSeconds": 60,
-  "mainThreadsTimeoutInSeconds": 600000,
-  "heartBeatIntervalInSeconds": 60000
+  "mainThreadsTimeoutInSeconds": 600,
+  "heartBeatIntervalInSeconds": 60
 }

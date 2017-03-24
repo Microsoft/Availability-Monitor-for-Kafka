@@ -57,7 +57,7 @@ public class CommonUtils {
      * Method to measure elapsed time since start time until now
      * <p>
      * Example:
-     * long startup = System.nanoTime();
+     * long startup = System.currentTimeMillis();
      * Thread.sleep(3000);
      * System.out.println("This took " + stopWatch(startup) + " milliseconds.");
      *
@@ -65,8 +65,7 @@ public class CommonUtils {
      * @return Elapsed time in seconds as double
      */
     public static long stopWatch(long startTime) {
-        long elapsedTime = System.nanoTime() - startTime;
-        return TimeUnit.MILLISECONDS.convert(elapsedTime, TimeUnit.NANOSECONDS);
+        return System.currentTimeMillis() - startTime;
     }
 
     public static void dumpPhaserState(String when, Phaser phaser) {

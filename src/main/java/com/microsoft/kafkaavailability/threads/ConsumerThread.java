@@ -56,7 +56,7 @@ public class ConsumerThread implements Callable<Long> {
     public Long call() throws Exception {
         int sleepDuration = 1000;
         long elapsedTime = 0L;
-        long lStartTime = System.nanoTime();
+        long lStartTime = System.currentTimeMillis();
         MetricRegistry metrics;
         m_logger.info(Thread.currentThread().getName() +
                 " - Consumer party has arrived and is working in "
@@ -72,7 +72,10 @@ public class ConsumerThread implements Callable<Long> {
 
         } catch (Exception e) {
             m_logger.error(e.getMessage(), e);
-            m_phaser.arriveAndDeregister();
+            try {
+                m_phaser.arriveAndDeregister();
+            } catch (IllegalStateException success) {
+            }
         } finally {
             try {
                 metricsFactory.report();
@@ -85,7 +88,10 @@ public class ConsumerThread implements Callable<Long> {
         elapsedTime = CommonUtils.stopWatch(lStartTime);
         m_logger.info("Consumer Elapsed: " + elapsedTime + " milliseconds.");
 
-        m_phaser.arriveAndDeregister();
+        try {
+            m_phaser.arriveAndDeregister();
+        } catch (IllegalStateException exception) {
+        }
         CommonUtils.dumpPhaserState("After arrival of ConsumerThread", m_phaser);
         m_logger.info("ConsumerThread (run()) has been COMPLETED.");
         return Long.valueOf(elapsedTime);
