@@ -9,11 +9,13 @@ import com.codahale.metrics.Histogram;
 import com.codahale.metrics.MetricRegistry;
 import com.codahale.metrics.SlidingWindowReservoir;
 import com.google.gson.Gson;
+import com.google.inject.Inject;
+import com.google.inject.assistedinject.Assisted;
 import com.microsoft.kafkaavailability.*;
 import com.microsoft.kafkaavailability.discovery.CommonUtils;
 import com.microsoft.kafkaavailability.metrics.AvailabilityGauge;
 import com.microsoft.kafkaavailability.metrics.MetricNameEncoded;
-import com.microsoft.kafkaavailability.metrics.MetricsFactory;
+import com.microsoft.kafkaavailability.reporters.ScheduledReporterCollector;
 import com.microsoft.kafkaavailability.properties.AppProperties;
 import com.microsoft.kafkaavailability.properties.ConsumerProperties;
 import com.microsoft.kafkaavailability.properties.MetaDataManagerProperties;
@@ -33,22 +35,27 @@ import static com.microsoft.kafkaavailability.discovery.Constants.DEFAULT_ELAPSE
 public class ConsumerThread implements Callable<Long> {
 
     final static Logger m_logger = LoggerFactory.getLogger(ConsumerThread.class);
-    Phaser m_phaser;
-    CuratorFramework m_curatorFramework;
-    List<String> m_listServers;
-    String m_serviceSpec;
-    String m_clusterName;
-    MetricsFactory metricsFactory;
-    long m_threadSleepTime;
 
-    public ConsumerThread(Phaser phaser, CuratorFramework curatorFramework, List<String> listServers, String serviceSpec, String clusterName, long threadSleepTime) {
-        this.m_phaser = phaser;
+    private final ScheduledReporterCollector reporterCollector;
+    private final CuratorFramework m_curatorFramework;
+
+    private Phaser m_phaser;
+    private List<String> m_listServers;
+    private String m_serviceSpec;
+    private long m_threadSleepTime;
+
+    @Inject
+    public ConsumerThread(CuratorFramework curatorFramework, ScheduledReporterCollector reporterCollector,
+                          @Assisted  Phaser phaser, @Assisted List<String> listServers, @Assisted String serviceSpec,
+                          @Assisted long threadSleepTime) {
         this.m_curatorFramework = curatorFramework;
+        this.reporterCollector = reporterCollector;
+
+        this.m_phaser = phaser;
         this.m_phaser.register(); //Registers/Add a new unArrived party to this phaser.
         CommonUtils.dumpPhaserState("After registration of ConsumerThread", phaser);
         m_listServers = listServers;
         m_serviceSpec = serviceSpec;
-        m_clusterName = clusterName;
         this.m_threadSleepTime = threadSleepTime;
     }
 
@@ -63,13 +70,9 @@ public class ConsumerThread implements Callable<Long> {
                 + "Phase-" + m_phaser.getPhase());
 
         try {
-            metricsFactory = new MetricsFactory();
-            metricsFactory.configure(m_clusterName);
-
-            metricsFactory.start();
-            metrics = metricsFactory.getRegistry();
-            RunConsumer(metrics);
-
+            reporterCollector.start();
+            metrics = reporterCollector.getRegistry();
+            runConsumer(metrics);
         } catch (Exception e) {
             m_logger.error(e.getMessage(), e);
             try {
@@ -78,9 +81,9 @@ public class ConsumerThread implements Callable<Long> {
             }
         } finally {
             try {
-                metricsFactory.report();
+                reporterCollector.report();
                 CommonUtils.sleep(1000);
-                metricsFactory.stop();
+                reporterCollector.stop();
             } catch (Exception e) {
                 m_logger.error(e.getMessage(), e);
             }
@@ -97,7 +100,7 @@ public class ConsumerThread implements Callable<Long> {
         return Long.valueOf(elapsedTime);
     }
 
-    private void RunConsumer(MetricRegistry metrics) throws IOException, MetaDataManagerException {
+    private void runConsumer(MetricRegistry metrics) throws IOException, MetaDataManagerException {
 
         m_logger.info("Starting ConsumerLatency");
 

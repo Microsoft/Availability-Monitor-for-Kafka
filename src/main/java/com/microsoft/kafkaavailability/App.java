@@ -5,28 +5,33 @@
 
 package com.microsoft.kafkaavailability;
 
+import com.google.common.collect.ImmutableSet;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
+import com.google.inject.Guice;
+import com.google.inject.Injector;
+import com.google.inject.Module;
+import com.google.inject.multibindings.MultibindingsScanner;
 import com.microsoft.kafkaavailability.discovery.CommonUtils;
-import com.microsoft.kafkaavailability.discovery.Constants;
-import com.microsoft.kafkaavailability.discovery.CuratorClient;
 import com.microsoft.kafkaavailability.discovery.CuratorManager;
+import com.microsoft.kafkaavailability.module.AppModule;
+import com.microsoft.kafkaavailability.module.ModuleScanner;
+import com.microsoft.kafkaavailability.module.ReportersModule;
+import com.microsoft.kafkaavailability.module.ThreadsModule;
 import com.microsoft.kafkaavailability.properties.AppProperties;
 import com.microsoft.kafkaavailability.properties.MetaDataManagerProperties;
-import com.microsoft.kafkaavailability.threads.*;
+import com.microsoft.kafkaavailability.threads.HeartBeat;
+import com.microsoft.kafkaavailability.threads.HeartBeatFactory;
+import com.microsoft.kafkaavailability.threads.JobManager;
+import com.microsoft.kafkaavailability.threads.ThreadFactory;
 import org.apache.commons.cli.*;
-import org.apache.curator.framework.CuratorFramework;
-import org.apache.curator.framework.imps.CuratorFrameworkState;
 import org.apache.log4j.MDC;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.*;
-import java.util.concurrent.Phaser;
-import java.util.concurrent.TimeUnit;
 
 /***
  * Sends a canary message to every topic and partition in Kafka.
@@ -42,17 +47,13 @@ public class App {
     static MetaDataManagerProperties metaDataProperties;
     static List<String> listServers;
 
-    private static String registrationPath = Constants.DEFAULT_REGISTRATION_ROOT;
-    private static String ip = CommonUtils.getIpAddress();
     private static String computerName = CommonUtils.getComputerName();
     private static String serviceSpec = "";
 
     public static void main(String[] args) throws IOException, MetaDataManagerException, InterruptedException {
         m_logger.info("Starting KafkaAvailability Tool");
-        IPropertiesManager appPropertiesManager = new PropertiesManager<>("appProperties.json", AppProperties.class);
-        IPropertiesManager metaDataPropertiesManager = new PropertiesManager<>("metadatamanagerProperties.json", MetaDataManagerProperties.class);
-        appProperties = (AppProperties) appPropertiesManager.getProperties();
-        metaDataProperties = (MetaDataManagerProperties) metaDataPropertiesManager.getProperties();
+
+
         Options options = new Options();
         options.addOption("r", "run", true, "Number of runs. Don't use this argument if you want to run infinitely.");
         options.addOption("s", "sleep", true, "Time (in milliseconds) to sleep between each run. Default is 30000");
@@ -60,25 +61,33 @@ public class App {
 
         CommandLineParser parser = new DefaultParser();
         HelpFormatter formatter = new HelpFormatter();
-        final CuratorFramework curatorFramework = CuratorClient.getCuratorFramework(metaDataProperties.zooKeeperHosts);
 
         try {
             // parse the command line arguments
             CommandLine line = parser.parse(options, args);
             int howManyRuns;
 
-            if(appProperties.environmentName == null || appProperties.environmentName.equals("")) {
-                if(line.hasOption("cluster")) {
-                    appProperties.environmentName = line.getOptionValue("cluster");   
-                } else {
-                    throw new IllegalArgumentException("cluster name must be provided either on the command line or in the app properties");
-                }
-            } 
-            
-            MDC.put("cluster", appProperties.environmentName);
+            //Parent injector to process command line arguments and json files
+            Injector parent = Guice.createInjector(new AppModule(line, "reporterProperties.json", "appProperties.json", "metadatamanagerProperties.json"));
 
+            ImmutableSet<Module> allGuiceModules = ImmutableSet.<Module>builder()
+                    .add(MultibindingsScanner.asModule())
+                    .add(parent.getInstance(ReportersModule.class))
+                    .add(parent.getInstance(ThreadsModule.class))
+                    .addAll(ModuleScanner.getModulesFromDependencies())
+                    .build();
+
+            Injector injector = parent.createChildInjector(allGuiceModules.toArray(new Module[allGuiceModules.size()]));
+
+            appProperties = injector.getInstance(AppProperties.class);
+            metaDataProperties = injector.getInstance(MetaDataManagerProperties.class);
+
+            final CuratorManager curatorManager = injector.getInstance(CuratorManager.class);
+            final ThreadFactory threadFactory = injector.getInstance(ThreadFactory.class);
+            final HeartBeatFactory heartBeatFactory = injector.getInstance(HeartBeatFactory.class);
+
+            MDC.put("cluster", appProperties.environmentName);
             MDC.put("computerName", computerName);
-            CuratorManager curatorManager = CallRegister(curatorFramework);
 
             if (line.hasOption("sleep")) {
                 m_sleepTime = Integer.parseInt(line.getOptionValue("sleep"));
@@ -88,13 +97,13 @@ public class App {
                 howManyRuns = Integer.parseInt(line.getOptionValue("run"));
                 for (int i = 0; i < howManyRuns; i++) {
                     waitForChanges(curatorManager);
-                    RunOnce(curatorFramework);
+                    runOnce(threadFactory, heartBeatFactory);
                     Thread.sleep(m_sleepTime);
                 }
             } else {
                 while (true) {
                     waitForChanges(curatorManager);
-                    RunOnce(curatorFramework);
+                    runOnce(threadFactory, heartBeatFactory);
                     Thread.sleep(m_sleepTime);
                 }
             }
@@ -107,37 +116,6 @@ public class App {
         }
         //used to run shutdown hooks before the program quits. The shutdown hooks (if properly set up) take care of doing all necessary shutdown ceremonies such as closing files, releasing resources etc.
         System.exit(0);
-    }
-
-
-    private static CuratorManager CallRegister(final CuratorFramework curatorFramework) throws Exception {
-        int port = ((int) (65535 * Math.random()));
-        serviceSpec = ip + ":" + Integer.valueOf(port).toString();
-
-        String basePath = new StringBuilder().append(registrationPath).toString();
-        m_logger.info("Creating client, KAT in the Environment:" + appProperties.environmentName);
-
-        final CuratorManager curatorManager = new CuratorManager(curatorFramework, basePath, ip, serviceSpec);
-
-        try {
-            curatorManager.registerLocalService();
-
-            Runtime.getRuntime().addShutdownHook(new Thread() {
-
-                @Override
-                public void run() {
-                    m_logger.info("Normal shutdown executing.");
-                    curatorManager.unregisterService();
-                    if (curatorFramework != null && (curatorFramework.getState().equals(CuratorFrameworkState.STARTED) || curatorFramework.getState().equals(CuratorFrameworkState.LATENT))) {
-                        curatorFramework.close();
-                    }
-                }
-            });
-        } catch (Exception e) {
-            m_logger.error(e.getMessage(), e);
-        }
-
-        return curatorManager;
     }
 
     private static void waitForChanges(CuratorManager curatorManager) throws Exception {
@@ -156,11 +134,11 @@ public class App {
         }
     }
 
-    private static void RunOnce(CuratorFramework curatorFramework) throws IOException, MetaDataManagerException {
+    private static void runOnce(ThreadFactory threadFactory, HeartBeatFactory heartBeatFactory) throws IOException, MetaDataManagerException {
 
         //default to 1 minute, if not configured
         long heartBeatIntervalInSeconds = (appProperties.heartBeatIntervalInSeconds > 0 ? appProperties.heartBeatIntervalInSeconds : 60);
-        HeartBeat beat = new HeartBeat(appProperties.environmentName, heartBeatIntervalInSeconds);
+        HeartBeat beat = heartBeatFactory.createHeartBeat(heartBeatIntervalInSeconds);
         beat.start();
 
         /** The phaser is a nice synchronization barrier. */
@@ -224,10 +202,10 @@ public class App {
         ConsumerThread usually takes longer to finish as it has to initiate multiple child threads for consuming data from each topic and partition.
         Adding one extra minute to other threads so that they can finish the current execution (they perform same operation multiple times) otherwise they may also get get interupted.
          */
-        JobManager LeaderInfoJob = new JobManager(mainThreadsTimeoutInSeconds , TimeUnit.SECONDS, new LeaderInfoThread(phaser, curatorFramework, leaderInfoThreadSleepTime), "LeaderInfoThread");
-        JobManager ProducerJob = new JobManager(mainThreadsTimeoutInSeconds , TimeUnit.SECONDS, new ProducerThread(phaser, curatorFramework, producerThreadSleepTime, appProperties.environmentName), "ProducerThread");
-        JobManager AvailabilityJob = new JobManager(mainThreadsTimeoutInSeconds , TimeUnit.SECONDS, new AvailabilityThread(phaser, curatorFramework, availabilityThreadSleepTime, appProperties.environmentName), "AvailabilityThread");
-        JobManager ConsumerJob = new JobManager(mainThreadsTimeoutInSeconds, TimeUnit.SECONDS, new ConsumerThread(phaser, curatorFramework, listServers, serviceSpec, appProperties.environmentName, consumerThreadSleepTime), "ConsumerThread");
+        JobManager LeaderInfoJob = new JobManager(mainThreadsTimeoutInSeconds , TimeUnit.SECONDS, threadFactory.createLeaderInfoThread(phaser, leaderInfoThreadSleepTime), "LeaderInfoThread");
+        JobManager ProducerJob = new JobManager(mainThreadsTimeoutInSeconds , TimeUnit.SECONDS, threadFactory.createProducerThread(phaser, producerThreadSleepTime), "ProducerThread");
+        JobManager AvailabilityJob = new JobManager(mainThreadsTimeoutInSeconds , TimeUnit.SECONDS, threadFactory.createAvailabilityThread(phaser, availabilityThreadSleepTime), "AvailabilityThread");
+        JobManager ConsumerJob = new JobManager(mainThreadsTimeoutInSeconds, TimeUnit.SECONDS, threadFactory.createConsumerThread(phaser, listServers, serviceSpec, consumerThreadSleepTime), "ConsumerThread");
 
         service.submit(LeaderInfoJob);
         service.submit(ProducerJob);

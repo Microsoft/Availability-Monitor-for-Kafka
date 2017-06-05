@@ -9,10 +9,9 @@ package com.microsoft.kafkaavailability.properties;
 
 import java.util.List;
 
-public class AppProperties
-{
+public class AppProperties {
+
     public String environmentName;
-    public String sqlConnectionString;
     public boolean reportKafkaGTMAvailability;
     public boolean reportKafkaIPAvailability;
     public List<String> kafkaGTMIP;

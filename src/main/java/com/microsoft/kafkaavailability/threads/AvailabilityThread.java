@@ -9,11 +9,13 @@ import com.codahale.metrics.Histogram;
 import com.codahale.metrics.MetricRegistry;
 import com.codahale.metrics.SlidingWindowReservoir;
 import com.google.gson.Gson;
+import com.google.inject.Inject;
+import com.google.inject.assistedinject.Assisted;
 import com.microsoft.kafkaavailability.*;
 import com.microsoft.kafkaavailability.discovery.CommonUtils;
 import com.microsoft.kafkaavailability.metrics.AvailabilityGauge;
 import com.microsoft.kafkaavailability.metrics.MetricNameEncoded;
-import com.microsoft.kafkaavailability.metrics.MetricsFactory;
+import com.microsoft.kafkaavailability.reporters.ScheduledReporterCollector;
 import com.microsoft.kafkaavailability.properties.AppProperties;
 import com.microsoft.kafkaavailability.properties.MetaDataManagerProperties;
 import com.microsoft.kafkaavailability.properties.ProducerProperties;
@@ -22,11 +24,12 @@ import org.apache.curator.framework.CuratorFramework;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.*;
-import java.net.*;
+import java.io.IOException;
+import java.net.MalformedURLException;
+import java.net.URL;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.*;
+import java.util.concurrent.Callable;
 import java.util.concurrent.Phaser;
 
 import static com.microsoft.kafkaavailability.discovery.Constants.DEFAULT_ELAPSED_TIME;
@@ -34,19 +37,25 @@ import static com.microsoft.kafkaavailability.discovery.Constants.DEFAULT_ELAPSE
 public class AvailabilityThread implements Callable<Long> {
 
     final static Logger m_logger = LoggerFactory.getLogger(AvailabilityThread.class);
-    Phaser m_phaser;
-    CuratorFramework m_curatorFramework;
-    long m_threadSleepTime;
-    String m_clusterName;
-    MetricsFactory metricsFactory;
 
-    public AvailabilityThread(Phaser phaser, CuratorFramework curatorFramework, long threadSleepTime, String clusterName) {
-        this.m_phaser = phaser;
+    private final ScheduledReporterCollector reporterCollector;
+    private final CuratorFramework m_curatorFramework;
+    private final AppProperties appProperties;
+
+    private Phaser m_phaser;
+    private long m_threadSleepTime;
+
+    @Inject
+    public AvailabilityThread(CuratorFramework curatorFramework, ScheduledReporterCollector reporterCollector,
+                              AppProperties appProperties, @Assisted Phaser phaser, @Assisted long threadSleepTime) {
         this.m_curatorFramework = curatorFramework;
+        this.reporterCollector = reporterCollector;
+        this.appProperties = appProperties;
+
+        this.m_phaser = phaser;
         //this.m_phaser.register(); //Registers/Add a new unArrived party to this phaser.
         //CommonUtils.dumpPhaserState("After register", phaser);
-        m_threadSleepTime = threadSleepTime;
-        m_clusterName = clusterName;
+        this.m_threadSleepTime = threadSleepTime;
     }
 
     @Override
@@ -61,20 +70,17 @@ public class AvailabilityThread implements Callable<Long> {
                     + "Phase-" + m_phaser.getPhase());
 
             try {
-                metricsFactory = new MetricsFactory();
-                metricsFactory.configure(m_clusterName);
-
-                metricsFactory.start();
-                metrics = metricsFactory.getRegistry();
+                reporterCollector.start();
+                metrics = reporterCollector.getRegistry();
                 RunAvailability(metrics);
 
             } catch (Exception e) {
                 m_logger.error(e.getMessage(), e);
             } finally {
                 try {
-                    metricsFactory.report();
+                    reporterCollector.report();
                     CommonUtils.sleep(1000);
-                    metricsFactory.stop();
+                    reporterCollector.stop();
                 } catch (Exception e) {
                     m_logger.error(e.getMessage(), e);
                 }
@@ -106,9 +112,6 @@ public class AvailabilityThread implements Callable<Long> {
         MetaDataManagerProperties metaDataProperties = (MetaDataManagerProperties) metaDataPropertiesManager.getProperties();
 
         IProducer producer = new Producer(producerPropertiesManager, metaDataManager);
-
-        IPropertiesManager appPropertiesManager = new PropertiesManager<AppProperties>("appProperties.json", AppProperties.class);
-        AppProperties appProperties = (AppProperties) appPropertiesManager.getProperties();
 
         //This is full list of topics
         List<TopicMetadata> totalTopicMetadata = metaDataManager.getAllTopicPartition();

@@ -9,11 +9,13 @@ import com.codahale.metrics.Histogram;
 import com.codahale.metrics.MetricRegistry;
 import com.codahale.metrics.SlidingWindowReservoir;
 import com.google.gson.Gson;
+import com.google.inject.Inject;
+import com.google.inject.assistedinject.Assisted;
 import com.microsoft.kafkaavailability.*;
 import com.microsoft.kafkaavailability.discovery.CommonUtils;
 import com.microsoft.kafkaavailability.metrics.AvailabilityGauge;
 import com.microsoft.kafkaavailability.metrics.MetricNameEncoded;
-import com.microsoft.kafkaavailability.metrics.MetricsFactory;
+import com.microsoft.kafkaavailability.reporters.ScheduledReporterCollector;
 import com.microsoft.kafkaavailability.properties.AppProperties;
 import com.microsoft.kafkaavailability.properties.MetaDataManagerProperties;
 import com.microsoft.kafkaavailability.properties.ProducerProperties;
@@ -25,7 +27,7 @@ import org.slf4j.LoggerFactory;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.*;
+import java.util.concurrent.Callable;
 import java.util.concurrent.Phaser;
 
 import static com.microsoft.kafkaavailability.discovery.Constants.DEFAULT_ELAPSED_TIME;
@@ -33,19 +35,23 @@ import static com.microsoft.kafkaavailability.discovery.Constants.DEFAULT_ELAPSE
 public class ProducerThread implements Callable<Long> {
 
     final static Logger m_logger = LoggerFactory.getLogger(ProducerThread.class);
-    Phaser m_phaser;
-    CuratorFramework m_curatorFramework;
-    MetricsFactory metricsFactory;
-    long m_threadSleepTime;
-    String m_clusterName;
 
-    public ProducerThread(Phaser phaser, CuratorFramework curatorFramework, long threadSleepTime, String clusterName) {
-        this.m_phaser = phaser;
+    private final ScheduledReporterCollector reporterCollector;
+    private final CuratorFramework m_curatorFramework;
+
+    private Phaser m_phaser;
+    private long m_threadSleepTime;
+
+    @Inject
+    public ProducerThread(CuratorFramework curatorFramework, ScheduledReporterCollector reporterCollector,
+                          @Assisted Phaser phaser, @Assisted long threadSleepTime) {
+        this.reporterCollector = reporterCollector;
         this.m_curatorFramework = curatorFramework;
+
+        this.m_phaser = phaser;
         //this.m_phaser.register(); //Registers/Add a new unArrived party to this phaser.
         //CommonUtils.dumpPhaserState("After register", phaser);
         this.m_threadSleepTime = threadSleepTime;
-        this.m_clusterName = clusterName;
     }
 
     @Override
@@ -61,20 +67,16 @@ public class ProducerThread implements Callable<Long> {
                     + "Phase-" + m_phaser.getPhase());
 
             try {
-                metricsFactory = new MetricsFactory();
-                metricsFactory.configure(m_clusterName);
-
-                metricsFactory.start();
-                metrics = metricsFactory.getRegistry();
-                RunProducer(metrics);
-
+                reporterCollector.start();
+                metrics = reporterCollector.getRegistry();
+                runProducer(metrics);
             } catch (Exception e) {
                 m_logger.error(e.getMessage(), e);
             } finally {
                 try {
-                    metricsFactory.report();
+                    reporterCollector.report();
                     CommonUtils.sleep(1000);
-                    metricsFactory.stop();
+                    reporterCollector.stop();
                 } catch (Exception e) {
                     m_logger.error(e.getMessage(), e);
                 }
@@ -97,7 +99,7 @@ public class ProducerThread implements Callable<Long> {
         return Long.valueOf(elapsedTime);
     }
 
-    private void RunProducer(MetricRegistry metrics) throws IOException, MetaDataManagerException {
+    private void runProducer(MetricRegistry metrics) throws IOException, MetaDataManagerException {
 
         m_logger.info("Starting ProducerLatency");
         IPropertiesManager producerPropertiesManager = new PropertiesManager<ProducerProperties>("producerProperties.json", ProducerProperties.class);

@@ -5,6 +5,8 @@
 
 package com.microsoft.kafkaavailability.threads;
 
+import com.google.inject.Inject;
+import com.google.inject.assistedinject.Assisted;
 import com.microsoft.kafkaavailability.*;
 import com.microsoft.kafkaavailability.discovery.CommonUtils;
 import com.microsoft.kafkaavailability.properties.MetaDataManagerProperties;
@@ -19,13 +21,16 @@ import java.util.concurrent.*;
 public class LeaderInfoThread implements Callable<Long> {
 
     final static Logger m_logger = LoggerFactory.getLogger(LeaderInfoThread.class);
-    Phaser m_phaser;
-    CuratorFramework m_curatorFramework;
-    long m_threadSleepTime;
+    private final CuratorFramework m_curatorFramework;
 
-    public LeaderInfoThread(Phaser phaser, CuratorFramework curatorFramework, long threadSleepTime) {
-        this.m_phaser = phaser;
+    private Phaser m_phaser;
+    private long m_threadSleepTime;
+
+    @Inject
+    public LeaderInfoThread(CuratorFramework curatorFramework, @Assisted Phaser phaser, @Assisted long threadSleepTime) {
         this.m_curatorFramework = curatorFramework;
+
+        this.m_phaser = phaser;
         this.m_threadSleepTime = threadSleepTime;
         //this.m_phaser.register(); //Registers/Add a new unArrived party to this phaser.
         //CommonUtils.dumpPhaserState("After registration of LeaderInfoThread", phaser);
