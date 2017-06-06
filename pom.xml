@@ -59,8 +59,8 @@
       <groupId>com.microsoft.kafkaavailability</groupId>
       <artifactId>kat-internal-metrics-reporters</artifactId>
       <version>1.0.4</version>
-      <optional>true</optional>
-      <scope>runtime</scope>
+      <scope>system</scope>
+      <systemPath>${basedir}/lib/common/kat-internal-metrics-reporters-1.0.4.jar</systemPath>
     </dependency>
     <dependency>
       <groupId>org.apache.commons</groupId>
@@ -173,16 +173,6 @@
   </dependencies>
 
   <repositories>
-    <repository>
-      <id>microsoft-siphon-java-visualstudio.com-siphonsdk</id>
-      <url>https://microsoft-siphon-java.pkgs.visualstudio.com/_packaging/SiphonSDK/maven/v1</url>
-      <releases>
-        <enabled>true</enabled>
-      </releases>
-      <snapshots>
-        <enabled>true</enabled>
-      </snapshots>
-    </repository>
   </repositories>
 
   <developers>
