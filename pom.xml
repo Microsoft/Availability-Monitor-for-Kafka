@@ -55,6 +55,7 @@
 
   <dependencies>
     <dependency>
+      <!-- Ignore this dependency if you're outside of microsoft, main thread should work fine without it -->
       <groupId>com.microsoft.kafkaavailability</groupId>
       <artifactId>kat-internal-metrics-reporters</artifactId>
       <version>1.0.4</version>
