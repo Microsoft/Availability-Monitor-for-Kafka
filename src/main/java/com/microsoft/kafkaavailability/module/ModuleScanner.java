@@ -22,6 +22,7 @@ public class ModuleScanner {
         for(Class<? extends AbstractModule> moduleClass : findAllModuleClasses()) {
             try {
                 modules.add(moduleClass.newInstance());
+                LOGGER.debug(moduleClass.getName() + " is found and included in injection.");
             } catch (InstantiationException | IllegalAccessException e) {
                 //Skip module classes that we can't get an instance for
                 LOGGER.error("Failed to get instance for module class: " + moduleClass.getName());

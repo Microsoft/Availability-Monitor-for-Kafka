@@ -58,6 +58,7 @@ public class ScheduledReporterCollector {
             List<String> reporterNames = Arrays.asList(reporterProperties.reportersCommaSeparatedList.split(","));
             for(String name : reporterNames) {
                if(allReporters.containsKey(name)) {
+                   LOGGER.debug(name + " is added to ScheduledReporterCollector.");
                    reportersToUse.add(allReporters.get(name));
                }
             }
