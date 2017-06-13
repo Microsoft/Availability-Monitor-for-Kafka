@@ -58,9 +58,7 @@
       <!-- Ignore this dependency if you're outside of microsoft, main thread should work fine without it -->
       <groupId>com.microsoft.kafkaavailability</groupId>
       <artifactId>kat-internal-metrics-reporters</artifactId>
-      <version>1.0.4</version>
-      <scope>system</scope>
-      <systemPath>${basedir}/lib/common/kat-internal-metrics-reporters-1.0.4.jar</systemPath>
+      <version>1.0-SNAPSHOT</version>
     </dependency>
     <dependency>
       <groupId>org.apache.commons</groupId>
@@ -168,6 +166,11 @@
   </dependencies>
 
   <repositories>
+    <repository>
+      <id>local-repo</id>
+      <name>Local</name>
+      <url>file://${basedir}/repo</url>
+    </repository>
   </repositories>
 
   <developers>
