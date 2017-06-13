@@ -8,17 +8,17 @@ package com.microsoft.kafkaavailability;
 import com.microsoft.kafkaavailability.properties.ProducerProperties;
 import kafka.producer.KeyedMessage;
 import kafka.producer.ProducerConfig;
+import org.apache.http.conn.ssl.SSLContextBuilder;
+import org.apache.http.conn.ssl.SSLContexts;
+import org.apache.http.conn.ssl.TrustStrategy;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.net.ssl.*;
-import java.io.BufferedReader;
-import java.io.DataOutputStream;
-import java.io.IOException;
-import java.io.InputStreamReader;
+import java.io.*;
 import java.net.URL;
-import java.security.KeyManagementException;
-import java.security.NoSuchAlgorithmException;
+import java.security.*;
+import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
 import java.util.Date;
 import java.util.Properties;
@@ -88,16 +88,17 @@ public class Producer implements IProducer {
      *
      * @param kafkaIP         kafkaClusterIP
      * @param topicName       topic name
-     * @param enableCertCheck enable ssl certificate check. Not required if the tool trusts the kafka server
+     * @param useKeyStoreToConnect enable ssl certificate check. Not required if the tool trusts the kafka server
      * @throws Exception
      */
 
-    public void SendCanaryToKafkaIP(String kafkaIP, String topicName, boolean enableCertCheck) throws Exception {
+    public void SendCanaryToKafkaIP(String kafkaIP, String topicName, boolean useKeyStoreToConnect) throws Exception {
         URL obj = new URL(kafkaIP + topicName);
         HttpsURLConnection con = (HttpsURLConnection) obj.openConnection();
-        if (!enableCertCheck) {
-            setAcceptAllVerifier(con);
-        }
+
+        SSLSocketFactory sslSocketFactory = createSSLSocketFactory(useKeyStoreToConnect);
+        con.setSSLSocketFactory(sslSocketFactory);
+        con.setHostnameVerifier(ALL_TRUSTING_HOSTNAME_VERIFIER);
 
         for (int i = 0; i < m_vipRetries; i++) {
             try {
@@ -156,37 +157,31 @@ public class Producer implements IProducer {
         }
     }
 
-    protected static void setAcceptAllVerifier(HttpsURLConnection connection) throws NoSuchAlgorithmException, KeyManagementException {
+    private SSLSocketFactory createSSLSocketFactory(boolean useKeyStoreToConnect) throws KeyStoreException, IOException, CertificateException, NoSuchAlgorithmException, UnrecoverableKeyException, KeyManagementException {
 
-        // Create the socket factory.
-        // Reusing the same socket factory allows sockets to be
-        // reused, supporting persistent connections.
-        if (null == m_sslSocketFactory) {
-            SSLContext sc = SSLContext.getInstance("SSL");
-            sc.init(null, ALL_TRUSTING_TRUST_MANAGER, new java.security.SecureRandom());
-            m_sslSocketFactory = sc.getSocketFactory();
+        KeyStore trustStore = KeyStore.getInstance(KeyStore.getDefaultType());
+        try (InputStream ksStream = getClass().getClassLoader().getResourceAsStream("/keystore")){
+            trustStore.load(ksStream, "password".toCharArray());
         }
 
-        connection.setSSLSocketFactory(m_sslSocketFactory);
+        SSLContextBuilder sslContextBuilder = SSLContexts.custom()
+                .useSSL()
+                .loadTrustMaterial(trustStore, new TrustStrategy() {
+                    //trust everything
+                    @Override
+                    public boolean isTrusted(X509Certificate[] chain, String authType) throws CertificateException {
+                        return true;
+                    }
+                })
+                .setSecureRandom(new java.security.SecureRandom());
 
-        // Since we may be using a cert with a different name, we need to ignore
-        // the hostname as well.
-        connection.setHostnameVerifier(ALL_TRUSTING_HOSTNAME_VERIFIER);
+        if(useKeyStoreToConnect) {
+            sslContextBuilder.loadKeyMaterial(trustStore, "password".toCharArray());
+        }
+
+        SSLContext sslContext = sslContextBuilder.build();
+        return sslContext.getSocketFactory();
     }
-
-    private static final TrustManager[] ALL_TRUSTING_TRUST_MANAGER = new TrustManager[]{
-            new X509TrustManager() {
-                public X509Certificate[] getAcceptedIssuers() {
-                    return null;
-                }
-
-                public void checkClientTrusted(X509Certificate[] certs, String authType) {
-                }
-
-                public void checkServerTrusted(X509Certificate[] certs, String authType) {
-                }
-            }
-    };
 
     private static final HostnameVerifier ALL_TRUSTING_HOSTNAME_VERIFIER = new HostnameVerifier() {
         public boolean verify(String hostname, SSLSession session) {

@@ -133,14 +133,19 @@ public class AvailabilityThread implements Callable<Long> {
             vipList.addAll(appProperties.kafkaIP);
         }
 
-        PostData("KafkaGTMIP", metrics, producer, whiteListTopicMetadata, gtmList, appProperties.reportKafkaGTMAvailability, appProperties.sendGTMAvailabilityLatency);
-        PostData("KafkaIP", metrics, producer, whiteListTopicMetadata, vipList, appProperties.reportKafkaIPAvailability, appProperties.sendKafkaIPAvailabilityLatency);
+        PostData("KafkaGTMIP", metrics, producer, whiteListTopicMetadata, gtmList,
+                appProperties.reportKafkaGTMAvailability, appProperties.sendGTMAvailabilityLatency,
+                appProperties.useCertificateToConnectToKafkaGTM);
+        PostData("KafkaIP", metrics, producer, whiteListTopicMetadata, vipList,
+                appProperties.reportKafkaIPAvailability, appProperties.sendKafkaIPAvailabilityLatency,
+                appProperties.useCertificateToConnectToKafkaIP);
 
         ((MetaDataManager) metaDataManager).close();
         m_logger.info("Finished AvailabilityLatency");
     }
 
-    private void PostData(String name, MetricRegistry metrics, IProducer producer, List<kafka.javaapi.TopicMetadata> whiteListTopicMetadata, List<String> gtmList, Boolean reportAvailability, Boolean reportLatency) {
+    private void PostData(String name, MetricRegistry metrics, IProducer producer, List<kafka.javaapi.TopicMetadata>
+            whiteListTopicMetadata, List<String> gtmList, boolean reportAvailability, boolean reportLatency, boolean useCertificateToConnect) {
 
         int numMessages = 100;
         long startTime, endTime;
@@ -179,7 +184,7 @@ public class AvailabilityThread implements Callable<Long> {
                         startTime = System.currentTimeMillis();
                         try {
                             tryCount++;
-                            producer.SendCanaryToKafkaIP(gtm, item.topic(), false);
+                            producer.SendCanaryToKafkaIP(gtm, item.topic(), useCertificateToConnect);
                             endTime = System.currentTimeMillis();
                         } catch (Exception e) {
                             failCount++;
