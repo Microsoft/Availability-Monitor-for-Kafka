@@ -8,14 +8,16 @@ package com.microsoft.kafkaavailability;
 import com.microsoft.kafkaavailability.properties.ProducerProperties;
 import kafka.producer.KeyedMessage;
 import kafka.producer.ProducerConfig;
-import org.apache.http.conn.ssl.SSLContextBuilder;
 import org.apache.http.conn.ssl.SSLContexts;
 import org.apache.http.conn.ssl.TrustStrategy;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.net.ssl.*;
-import java.io.*;
+import java.io.BufferedReader;
+import java.io.DataOutputStream;
+import java.io.IOException;
+import java.io.InputStreamReader;
 import java.net.URL;
 import java.security.*;
 import java.security.cert.CertificateException;
@@ -161,31 +163,30 @@ public class Producer implements IProducer {
     }
 
     private SSLSocketFactory createSSLSocketFactory(boolean useKeyStoreToConnect, String keyStorePath,
-                                                    String keyStorePassword) throws KeyStoreException, IOException, CertificateException, NoSuchAlgorithmException, UnrecoverableKeyException, KeyManagementException {
+                                                    String keyStorePassword) throws KeyStoreException, UnrecoverableKeyException, KeyManagementException, NoSuchAlgorithmException {
 
-        KeyStore trustStore = KeyStore.getInstance(KeyStore.getDefaultType());
-        try (InputStream ksStream = getClass().getClassLoader().getResourceAsStream(keyStorePath)){
-            trustStore.load(ksStream, keyStorePassword.toCharArray());
+        KeyStore trustStore = null;
+        if (useKeyStoreToConnect) {
+            trustStore = KeyStoreLoader.loadKeyStore(keyStorePath, keyStorePassword);
         }
 
-        SSLContextBuilder sslContextBuilder = SSLContexts.custom()
+        SSLContext sslContext = SSLContexts.custom()
                 .useSSL()
                 .loadTrustMaterial(trustStore, new TrustStrategy() {
-                    //trust everything
+                    //Always trust
                     @Override
                     public boolean isTrusted(X509Certificate[] chain, String authType) throws CertificateException {
                         return true;
                     }
                 })
-                .setSecureRandom(new java.security.SecureRandom());
+                .loadKeyMaterial(trustStore, keyStorePassword.toCharArray())
+                .setSecureRandom(new java.security.SecureRandom())
+                .build();
 
-        if(useKeyStoreToConnect) {
-            sslContextBuilder.loadKeyMaterial(trustStore, keyStorePassword.toCharArray());
-        }
-
-        SSLContext sslContext = sslContextBuilder.build();
         return sslContext.getSocketFactory();
     }
+
+
 
     private static final HostnameVerifier ALL_TRUSTING_HOSTNAME_VERIFIER = new HostnameVerifier() {
         public boolean verify(String hostname, SSLSession session) {

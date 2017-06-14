@@ -228,7 +228,7 @@ public class App {
          */
         JobManager LeaderInfoJob = new JobManager(mainThreadsTimeoutInSeconds , TimeUnit.SECONDS, new LeaderInfoThread(phaser, curatorFramework, leaderInfoThreadSleepTime), "LeaderInfoThread");
         JobManager ProducerJob = new JobManager(mainThreadsTimeoutInSeconds , TimeUnit.SECONDS, new ProducerThread(phaser, curatorFramework, producerThreadSleepTime, appProperties.environmentName), "ProducerThread");
-        JobManager AvailabilityJob = new JobManager(mainThreadsTimeoutInSeconds , TimeUnit.SECONDS, new AvailabilityThread(phaser, curatorFramework, availabilityThreadSleepTime, appProperties.environmentName), "AvailabilityThread");
+        JobManager AvailabilityJob = new JobManager(mainThreadsTimeoutInSeconds , TimeUnit.SECONDS, new AvailabilityThread(phaser, curatorFramework, availabilityThreadSleepTime, appProperties), "AvailabilityThread");
         JobManager ConsumerJob = new JobManager(mainThreadsTimeoutInSeconds, TimeUnit.SECONDS, new ConsumerThread(phaser, curatorFramework, listServers, serviceSpec, appProperties.environmentName, consumerThreadSleepTime), "ConsumerThread");
 
         service.submit(LeaderInfoJob);

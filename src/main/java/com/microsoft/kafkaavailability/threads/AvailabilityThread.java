@@ -37,16 +37,16 @@ public class AvailabilityThread implements Callable<Long> {
     Phaser m_phaser;
     CuratorFramework m_curatorFramework;
     long m_threadSleepTime;
-    String m_clusterName;
     MetricsFactory metricsFactory;
+    final AppProperties appProperties;
 
-    public AvailabilityThread(Phaser phaser, CuratorFramework curatorFramework, long threadSleepTime, String clusterName) {
+    public AvailabilityThread(Phaser phaser, CuratorFramework curatorFramework, long threadSleepTime, AppProperties appProperties) {
         this.m_phaser = phaser;
         this.m_curatorFramework = curatorFramework;
         //this.m_phaser.register(); //Registers/Add a new unArrived party to this phaser.
         //CommonUtils.dumpPhaserState("After register", phaser);
         m_threadSleepTime = threadSleepTime;
-        m_clusterName = clusterName;
+        this.appProperties = appProperties;
     }
 
     @Override
@@ -62,7 +62,7 @@ public class AvailabilityThread implements Callable<Long> {
 
             try {
                 metricsFactory = new MetricsFactory();
-                metricsFactory.configure(m_clusterName);
+                metricsFactory.configure(appProperties.environmentName);
 
                 metricsFactory.start();
                 metrics = metricsFactory.getRegistry();
@@ -107,9 +107,6 @@ public class AvailabilityThread implements Callable<Long> {
 
         IProducer producer = new Producer(producerPropertiesManager, metaDataManager);
 
-        IPropertiesManager appPropertiesManager = new PropertiesManager<AppProperties>("appProperties.json", AppProperties.class);
-        AppProperties appProperties = (AppProperties) appPropertiesManager.getProperties();
-
         //This is full list of topics
         List<TopicMetadata> totalTopicMetadata = metaDataManager.getAllTopicPartition();
 
@@ -135,10 +132,12 @@ public class AvailabilityThread implements Callable<Long> {
 
         postData("KafkaGTMIP", metrics, producer, whiteListTopicMetadata, gtmList,
                 appProperties.reportKafkaGTMAvailability, appProperties.sendGTMAvailabilityLatency,
-                appProperties.useCertificateToConnectToKafkaGTM, appProperties.keyStoreFilePath);
+                appProperties.useCertificateToConnectToKafkaGTM, appProperties.keyStoreFilePath,
+                appProperties.keyStoreFilePassword);
         postData("KafkaIP", metrics, producer, whiteListTopicMetadata, vipList,
                 appProperties.reportKafkaIPAvailability, appProperties.sendKafkaIPAvailabilityLatency,
-                appProperties.useCertificateToConnectToKafkaIP, appProperties.keyStoreFilePath);
+                appProperties.useCertificateToConnectToKafkaIP, appProperties.keyStoreFilePath,
+                appProperties.keyStoreFilePassword);
 
         ((MetaDataManager) metaDataManager).close();
         m_logger.info("Finished AvailabilityLatency");
