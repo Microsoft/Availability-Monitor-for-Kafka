@@ -10,6 +10,6 @@ import java.io.IOException;
 public interface IProducer
 {
     void sendCanaryToTopicPartition(String topicName, String partitionId);
-    void sendCanaryToKafkaIP(String kafkaIP, String topicName, boolean enableCertCheck, String keyStorePath, String keyStorePassword) throws Exception;
+    void sendCanaryToKafkaIP(String kafkaIP, String topicName, boolean useCertToConnect, String keyStorePath, String keyStorePassword) throws Exception;
     void close() throws IOException;
 }

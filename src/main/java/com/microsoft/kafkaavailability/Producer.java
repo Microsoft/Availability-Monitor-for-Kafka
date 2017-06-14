@@ -90,18 +90,18 @@ public class Producer implements IProducer {
      *
      * @param kafkaIP         kafkaClusterIP
      * @param topicName       topic name
-     * @param useKeyStoreToConnect enable ssl certificate check. Not required if the tool trusts the kafka server
+     * @param useCertToConnect enable ssl certificate check. Not required if the tool trusts the kafka server
      * @param keyStorePath file path to KeyStore file
      * @param keyStorePassword password to load KeyStore file
      * @throws Exception
      */
 
-    public void sendCanaryToKafkaIP(String kafkaIP, String topicName, boolean useKeyStoreToConnect, String keyStorePath,
+    public void sendCanaryToKafkaIP(String kafkaIP, String topicName, boolean useCertToConnect, String keyStorePath,
                                     String keyStorePassword) throws Exception {
         URL obj = new URL(kafkaIP + topicName);
         HttpsURLConnection con = (HttpsURLConnection) obj.openConnection();
 
-        SSLSocketFactory sslSocketFactory = createSSLSocketFactory(useKeyStoreToConnect, keyStorePath, keyStorePassword);
+        SSLSocketFactory sslSocketFactory = createSSLSocketFactory(useCertToConnect, keyStorePath, keyStorePassword);
         con.setSSLSocketFactory(sslSocketFactory);
         con.setHostnameVerifier(ALL_TRUSTING_HOSTNAME_VERIFIER);
 
@@ -165,6 +165,7 @@ public class Producer implements IProducer {
     private SSLSocketFactory createSSLSocketFactory(boolean useKeyStoreToConnect, String keyStorePath,
                                                     String keyStorePassword) throws KeyStoreException, UnrecoverableKeyException, KeyManagementException, NoSuchAlgorithmException {
 
+        //Only load KeyStore when it's needed to connect to IP, SSLContext is fine with KeyStore being null otherwise.
         KeyStore trustStore = null;
         if (useKeyStoreToConnect) {
             trustStore = KeyStoreLoader.loadKeyStore(keyStorePath, keyStorePassword);
