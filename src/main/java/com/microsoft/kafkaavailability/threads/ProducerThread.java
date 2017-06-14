@@ -173,7 +173,7 @@ public class ProducerThread implements Callable<Long> {
                 startTime = System.currentTimeMillis();
                 try {
 
-                    producer.SendCanaryToTopicPartition(item.topic(), Integer.toString(part.partitionId()));
+                    producer.sendCanaryToTopicPartition(item.topic(), Integer.toString(part.partitionId()));
                     endTime = System.currentTimeMillis();
                 } catch (Exception e) {
                     m_logger.error("Error Writing to Topic: {}; Partition: {}; Exception: {}", item.topic(), part.partitionId(), e);

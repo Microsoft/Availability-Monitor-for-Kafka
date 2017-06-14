@@ -19,6 +19,8 @@ public class AppProperties
     public List<String> kafkaIP;
     public boolean useCertificateToConnectToKafkaGTM;
     public boolean useCertificateToConnectToKafkaIP;
+    public String keyStoreFilePath;
+    public String keyStoreFilePassword;
     public boolean sendProducerAvailability;
     public boolean sendConsumerAvailability;
     public boolean sendProducerTopicAvailability;

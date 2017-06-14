@@ -9,7 +9,7 @@ import java.io.IOException;
 
 public interface IProducer
 {
-    void SendCanaryToTopicPartition(String topicName, String partitionId);
-    void SendCanaryToKafkaIP(String kafkaIP, String topicName, boolean enableCertCheck) throws Exception;
+    void sendCanaryToTopicPartition(String topicName, String partitionId);
+    void sendCanaryToKafkaIP(String kafkaIP, String topicName, boolean enableCertCheck, String keyStorePath, String keyStorePassword) throws Exception;
     void close() throws IOException;
 }

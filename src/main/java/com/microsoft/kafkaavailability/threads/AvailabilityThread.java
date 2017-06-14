@@ -66,7 +66,7 @@ public class AvailabilityThread implements Callable<Long> {
 
                 metricsFactory.start();
                 metrics = metricsFactory.getRegistry();
-                RunAvailability(metrics);
+                runAvailability(metrics);
 
             } catch (Exception e) {
                 m_logger.error(e.getMessage(), e);
@@ -96,7 +96,7 @@ public class AvailabilityThread implements Callable<Long> {
         return Long.valueOf(elapsedTime);
     }
 
-    private void RunAvailability(MetricRegistry metrics) throws IOException, MetaDataManagerException {
+    private void runAvailability(MetricRegistry metrics) throws IOException, MetaDataManagerException {
 
         m_logger.info("Starting AvailabilityLatency");
 
@@ -133,19 +133,21 @@ public class AvailabilityThread implements Callable<Long> {
             vipList.addAll(appProperties.kafkaIP);
         }
 
-        PostData("KafkaGTMIP", metrics, producer, whiteListTopicMetadata, gtmList,
+        postData("KafkaGTMIP", metrics, producer, whiteListTopicMetadata, gtmList,
                 appProperties.reportKafkaGTMAvailability, appProperties.sendGTMAvailabilityLatency,
-                appProperties.useCertificateToConnectToKafkaGTM);
-        PostData("KafkaIP", metrics, producer, whiteListTopicMetadata, vipList,
+                appProperties.useCertificateToConnectToKafkaGTM, appProperties.keyStoreFilePath);
+        postData("KafkaIP", metrics, producer, whiteListTopicMetadata, vipList,
                 appProperties.reportKafkaIPAvailability, appProperties.sendKafkaIPAvailabilityLatency,
-                appProperties.useCertificateToConnectToKafkaIP);
+                appProperties.useCertificateToConnectToKafkaIP, appProperties.keyStoreFilePath);
 
         ((MetaDataManager) metaDataManager).close();
         m_logger.info("Finished AvailabilityLatency");
     }
 
-    private void PostData(String name, MetricRegistry metrics, IProducer producer, List<kafka.javaapi.TopicMetadata>
-            whiteListTopicMetadata, List<String> gtmList, boolean reportAvailability, boolean reportLatency, boolean useCertificateToConnect) {
+    private void postData(String name, MetricRegistry metrics, IProducer producer,
+                          List<kafka.javaapi.TopicMetadata> whiteListTopicMetadata, List<String> gtmList,
+                          boolean reportAvailability, boolean reportLatency, boolean useCertificateToConnect,
+                          String keyStoreFilePath, String keyStoreFilePassword) {
 
         int numMessages = 100;
         long startTime, endTime;
@@ -184,7 +186,7 @@ public class AvailabilityThread implements Callable<Long> {
                         startTime = System.currentTimeMillis();
                         try {
                             tryCount++;
-                            producer.SendCanaryToKafkaIP(gtm, item.topic(), useCertificateToConnect);
+                            producer.sendCanaryToKafkaIP(gtm, item.topic(), useCertificateToConnect, keyStoreFilePath, keyStoreFilePassword);
                             endTime = System.currentTimeMillis();
                         } catch (Exception e) {
                             failCount++;

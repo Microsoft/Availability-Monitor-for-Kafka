@@ -64,7 +64,7 @@ public class Producer implements IProducer {
      * @param partitionId partition id
      */
     @Override
-    public void SendCanaryToTopicPartition(String topicName, String partitionId) {
+    public void sendCanaryToTopicPartition(String topicName, String partitionId) {
         m_producer.send(createCanaryMessage(topicName, partitionId));
     }
 
@@ -89,14 +89,17 @@ public class Producer implements IProducer {
      * @param kafkaIP         kafkaClusterIP
      * @param topicName       topic name
      * @param useKeyStoreToConnect enable ssl certificate check. Not required if the tool trusts the kafka server
+     * @param keyStorePath file path to KeyStore file
+     * @param keyStorePassword password to load KeyStore file
      * @throws Exception
      */
 
-    public void SendCanaryToKafkaIP(String kafkaIP, String topicName, boolean useKeyStoreToConnect) throws Exception {
+    public void sendCanaryToKafkaIP(String kafkaIP, String topicName, boolean useKeyStoreToConnect, String keyStorePath,
+                                    String keyStorePassword) throws Exception {
         URL obj = new URL(kafkaIP + topicName);
         HttpsURLConnection con = (HttpsURLConnection) obj.openConnection();
 
-        SSLSocketFactory sslSocketFactory = createSSLSocketFactory(useKeyStoreToConnect);
+        SSLSocketFactory sslSocketFactory = createSSLSocketFactory(useKeyStoreToConnect, keyStorePath, keyStorePassword);
         con.setSSLSocketFactory(sslSocketFactory);
         con.setHostnameVerifier(ALL_TRUSTING_HOSTNAME_VERIFIER);
 
@@ -157,11 +160,12 @@ public class Producer implements IProducer {
         }
     }
 
-    private SSLSocketFactory createSSLSocketFactory(boolean useKeyStoreToConnect) throws KeyStoreException, IOException, CertificateException, NoSuchAlgorithmException, UnrecoverableKeyException, KeyManagementException {
+    private SSLSocketFactory createSSLSocketFactory(boolean useKeyStoreToConnect, String keyStorePath,
+                                                    String keyStorePassword) throws KeyStoreException, IOException, CertificateException, NoSuchAlgorithmException, UnrecoverableKeyException, KeyManagementException {
 
         KeyStore trustStore = KeyStore.getInstance(KeyStore.getDefaultType());
-        try (InputStream ksStream = getClass().getClassLoader().getResourceAsStream("/keystore")){
-            trustStore.load(ksStream, "password".toCharArray());
+        try (InputStream ksStream = getClass().getClassLoader().getResourceAsStream(keyStorePath)){
+            trustStore.load(ksStream, keyStorePassword.toCharArray());
         }
 
         SSLContextBuilder sslContextBuilder = SSLContexts.custom()
@@ -176,7 +180,7 @@ public class Producer implements IProducer {
                 .setSecureRandom(new java.security.SecureRandom());
 
         if(useKeyStoreToConnect) {
-            sslContextBuilder.loadKeyMaterial(trustStore, "password".toCharArray());
+            sslContextBuilder.loadKeyMaterial(trustStore, keyStorePassword.toCharArray());
         }
 
         SSLContext sslContext = sslContextBuilder.build();

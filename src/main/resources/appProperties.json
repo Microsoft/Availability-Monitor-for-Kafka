@@ -7,6 +7,8 @@
   "kafkaIP":["https://myTestEndpointVIP003.trafficmanager.net?topic=","https://myTestEndpointVIP004.trafficmanager.net?topic="],
   "useCertificateToConnectToKafkaGTM": false,
   "useCertificateToConnectToKafkaIP": false,
+  "keyStoreFilePath": "/path/to/keystore",
+  "keyStoreFilePassword": "password",
   "sendProducerAvailability": true,
   "sendConsumerAvailability": true,
   "sendProducerTopicAvailability": true,
