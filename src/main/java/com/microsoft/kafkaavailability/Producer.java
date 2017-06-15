@@ -99,15 +99,15 @@ public class Producer implements IProducer {
     public void sendCanaryToKafkaIP(String kafkaIP, String topicName, boolean useCertToConnect, String keyStorePath,
                                     String keyStorePassword) throws Exception {
         URL obj = new URL(kafkaIP + topicName);
-        HttpsURLConnection con = (HttpsURLConnection) obj.openConnection();
-
-        SSLSocketFactory sslSocketFactory = createSSLSocketFactory(useCertToConnect, keyStorePath, keyStorePassword);
-        con.setSSLSocketFactory(sslSocketFactory);
-        con.setHostnameVerifier(ALL_TRUSTING_HOSTNAME_VERIFIER);
+        HttpsURLConnection con = null;
 
         for (int i = 0; i < m_vipRetries; i++) {
             try {
+                con = (HttpsURLConnection) obj.openConnection();
 
+                SSLSocketFactory sslSocketFactory = createSSLSocketFactory(useCertToConnect, keyStorePath, keyStorePassword);
+                con.setSSLSocketFactory(sslSocketFactory);
+                con.setHostnameVerifier(ALL_TRUSTING_HOSTNAME_VERIFIER);
                 //add request header
                 con.setRequestMethod("POST");
                 con.setConnectTimeout(15000);
