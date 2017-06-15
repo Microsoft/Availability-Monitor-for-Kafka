@@ -21,12 +21,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.*;
-import java.util.concurrent.Phaser;
-import java.util.concurrent.TimeUnit;
 
 /***
  * Sends a canary message to every topic and partition in Kafka.
@@ -57,6 +54,7 @@ public class App {
         options.addOption("r", "run", true, "Number of runs. Don't use this argument if you want to run infinitely.");
         options.addOption("s", "sleep", true, "Time (in milliseconds) to sleep between each run. Default is 30000");
         options.addOption("c", "cluster", true, "Cluster name. will pull from here if appProperties is null");
+        options.addOption("p", "keyStorePassword", true, "Password to load KeyStore file, which is uesed to connect to cluster's secured public IP");
 
         CommandLineParser parser = new DefaultParser();
         HelpFormatter formatter = new HelpFormatter();
@@ -73,7 +71,11 @@ public class App {
                 } else {
                     throw new IllegalArgumentException("cluster name must be provided either on the command line or in the app properties");
                 }
-            } 
+            }
+
+            if(line.hasOption("keyStorePassword")) {
+                appProperties.keyStoreFilePassword = line.getOptionValue("keyStorePassword");
+            }
             
             MDC.put("cluster", appProperties.environmentName);
 
@@ -226,7 +228,7 @@ public class App {
          */
         JobManager LeaderInfoJob = new JobManager(mainThreadsTimeoutInSeconds , TimeUnit.SECONDS, new LeaderInfoThread(phaser, curatorFramework, leaderInfoThreadSleepTime), "LeaderInfoThread");
         JobManager ProducerJob = new JobManager(mainThreadsTimeoutInSeconds , TimeUnit.SECONDS, new ProducerThread(phaser, curatorFramework, producerThreadSleepTime, appProperties.environmentName), "ProducerThread");
-        JobManager AvailabilityJob = new JobManager(mainThreadsTimeoutInSeconds , TimeUnit.SECONDS, new AvailabilityThread(phaser, curatorFramework, availabilityThreadSleepTime, appProperties.environmentName), "AvailabilityThread");
+        JobManager AvailabilityJob = new JobManager(mainThreadsTimeoutInSeconds , TimeUnit.SECONDS, new AvailabilityThread(phaser, curatorFramework, availabilityThreadSleepTime, appProperties), "AvailabilityThread");
         JobManager ConsumerJob = new JobManager(mainThreadsTimeoutInSeconds, TimeUnit.SECONDS, new ConsumerThread(phaser, curatorFramework, listServers, serviceSpec, appProperties.environmentName, consumerThreadSleepTime), "ConsumerThread");
 
         service.submit(LeaderInfoJob);

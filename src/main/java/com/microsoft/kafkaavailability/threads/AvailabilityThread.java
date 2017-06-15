@@ -37,16 +37,16 @@ public class AvailabilityThread implements Callable<Long> {
     Phaser m_phaser;
     CuratorFramework m_curatorFramework;
     long m_threadSleepTime;
-    String m_clusterName;
     MetricsFactory metricsFactory;
+    final AppProperties appProperties;
 
-    public AvailabilityThread(Phaser phaser, CuratorFramework curatorFramework, long threadSleepTime, String clusterName) {
+    public AvailabilityThread(Phaser phaser, CuratorFramework curatorFramework, long threadSleepTime, AppProperties appProperties) {
         this.m_phaser = phaser;
         this.m_curatorFramework = curatorFramework;
         //this.m_phaser.register(); //Registers/Add a new unArrived party to this phaser.
         //CommonUtils.dumpPhaserState("After register", phaser);
         m_threadSleepTime = threadSleepTime;
-        m_clusterName = clusterName;
+        this.appProperties = appProperties;
     }
 
     @Override
@@ -62,11 +62,11 @@ public class AvailabilityThread implements Callable<Long> {
 
             try {
                 metricsFactory = new MetricsFactory();
-                metricsFactory.configure(m_clusterName);
+                metricsFactory.configure(appProperties.environmentName);
 
                 metricsFactory.start();
                 metrics = metricsFactory.getRegistry();
-                RunAvailability(metrics);
+                runAvailability(metrics);
 
             } catch (Exception e) {
                 m_logger.error(e.getMessage(), e);
@@ -96,7 +96,7 @@ public class AvailabilityThread implements Callable<Long> {
         return Long.valueOf(elapsedTime);
     }
 
-    private void RunAvailability(MetricRegistry metrics) throws IOException, MetaDataManagerException {
+    private void runAvailability(MetricRegistry metrics) throws IOException, MetaDataManagerException {
 
         m_logger.info("Starting AvailabilityLatency");
 
@@ -106,9 +106,6 @@ public class AvailabilityThread implements Callable<Long> {
         MetaDataManagerProperties metaDataProperties = (MetaDataManagerProperties) metaDataPropertiesManager.getProperties();
 
         IProducer producer = new Producer(producerPropertiesManager, metaDataManager);
-
-        IPropertiesManager appPropertiesManager = new PropertiesManager<AppProperties>("appProperties.json", AppProperties.class);
-        AppProperties appProperties = (AppProperties) appPropertiesManager.getProperties();
 
         //This is full list of topics
         List<TopicMetadata> totalTopicMetadata = metaDataManager.getAllTopicPartition();
@@ -133,14 +130,23 @@ public class AvailabilityThread implements Callable<Long> {
             vipList.addAll(appProperties.kafkaIP);
         }
 
-        PostData("KafkaGTMIP", metrics, producer, whiteListTopicMetadata, gtmList, appProperties.reportKafkaGTMAvailability, appProperties.sendGTMAvailabilityLatency);
-        PostData("KafkaIP", metrics, producer, whiteListTopicMetadata, vipList, appProperties.reportKafkaIPAvailability, appProperties.sendKafkaIPAvailabilityLatency);
+        postData("KafkaGTMIP", metrics, producer, whiteListTopicMetadata, gtmList,
+                appProperties.reportKafkaGTMAvailability, appProperties.sendGTMAvailabilityLatency,
+                appProperties.useCertificateToConnectToKafkaGTM, appProperties.keyStoreFilePath,
+                appProperties.keyStoreFilePassword);
+        postData("KafkaIP", metrics, producer, whiteListTopicMetadata, vipList,
+                appProperties.reportKafkaIPAvailability, appProperties.sendKafkaIPAvailabilityLatency,
+                appProperties.useCertificateToConnectToKafkaIP, appProperties.keyStoreFilePath,
+                appProperties.keyStoreFilePassword);
 
         ((MetaDataManager) metaDataManager).close();
         m_logger.info("Finished AvailabilityLatency");
     }
 
-    private void PostData(String name, MetricRegistry metrics, IProducer producer, List<kafka.javaapi.TopicMetadata> whiteListTopicMetadata, List<String> gtmList, Boolean reportAvailability, Boolean reportLatency) {
+    private void postData(String name, MetricRegistry metrics, IProducer producer,
+                          List<kafka.javaapi.TopicMetadata> whiteListTopicMetadata, List<String> gtmList,
+                          boolean reportAvailability, boolean reportLatency, boolean useCertificateToConnect,
+                          String keyStoreFilePath, String keyStoreFilePassword) {
 
         int numMessages = 100;
         long startTime, endTime;
@@ -179,7 +185,7 @@ public class AvailabilityThread implements Callable<Long> {
                         startTime = System.currentTimeMillis();
                         try {
                             tryCount++;
-                            producer.SendCanaryToKafkaIP(gtm, item.topic(), false);
+                            producer.sendCanaryToKafkaIP(gtm, item.topic(), useCertificateToConnect, keyStoreFilePath, keyStoreFilePassword);
                             endTime = System.currentTimeMillis();
                         } catch (Exception e) {
                             failCount++;
