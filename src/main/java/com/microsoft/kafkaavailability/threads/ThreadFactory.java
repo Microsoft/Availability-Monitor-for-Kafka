@@ -7,6 +7,6 @@ public interface ThreadFactory {
     AvailabilityThread createAvailabilityThread(Phaser phaser, long threadSleepTime);
     ProducerThread createProducerThread(Phaser phaser, long threadSleepTime);
     HeartBeatThread createHeartBeatThread(String serverName);
-    ConsumerThread createConsumerThread(Phaser phaser, List<String> listServers, String serviceSpec, long threadSleepTime);
+    ConsumerThread createConsumerThread(Phaser phaser, List<String> listServers, long threadSleepTime);
     LeaderInfoThread createLeaderInfoThread(Phaser phaser, long threadSleepTime);
 }

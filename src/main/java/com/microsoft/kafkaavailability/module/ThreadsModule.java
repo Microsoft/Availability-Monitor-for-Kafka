@@ -13,6 +13,7 @@ import com.microsoft.kafkaavailability.discovery.CuratorManager;
 import com.microsoft.kafkaavailability.properties.AppProperties;
 import com.microsoft.kafkaavailability.properties.MetaDataManagerProperties;
 import com.microsoft.kafkaavailability.threads.HeartBeatFactory;
+import com.microsoft.kafkaavailability.threads.ServiceSpecProvider;
 import com.microsoft.kafkaavailability.threads.ThreadFactory;
 import org.apache.curator.framework.CuratorFramework;
 import org.apache.curator.framework.imps.CuratorFrameworkState;
@@ -25,6 +26,7 @@ public class ThreadsModule extends AbstractModule {
     @Override
     protected void configure() {
         bindConstant().annotatedWith(Names.named("localIPAddress")).to(CommonUtils.getIpAddress());
+        bindConstant().annotatedWith(Names.named("curatorPort")).to((int) (65535 * Math.random()));
 
         install(new FactoryModuleBuilder().build(ThreadFactory.class));
         install(new FactoryModuleBuilder().build(HeartBeatFactory.class));
@@ -32,14 +34,14 @@ public class ThreadsModule extends AbstractModule {
 
     @Provides
     @Singleton
-    public CuratorManager curatorManager(@Named("localIPAddress") String localIPAddress, final  CuratorFramework curatorFramework, AppProperties appProperties) {
-        int port = ((int) (65535 * Math.random()));
-        String serviceSpec = localIPAddress + ":" + Integer.valueOf(port).toString();
+    public CuratorManager curatorManager(@Named("localIPAddress") String localIPAddress,
+                                         ServiceSpecProvider serviceSpecProvider, final CuratorFramework curatorFramework,
+                                         AppProperties appProperties) {
 
-        String basePath = new StringBuilder().append(Constants.DEFAULT_REGISTRATION_ROOT).toString();
         LOGGER.info("Creating client, KAT in the Environment:" + appProperties.environmentName);
 
-        final CuratorManager curatorManager = new CuratorManager(curatorFramework, basePath, localIPAddress, serviceSpec);
+        final CuratorManager curatorManager = new CuratorManager(curatorFramework, Constants.DEFAULT_REGISTRATION_ROOT,
+                localIPAddress, serviceSpecProvider.getServiceSpec());
 
         try {
             curatorManager.registerLocalService();

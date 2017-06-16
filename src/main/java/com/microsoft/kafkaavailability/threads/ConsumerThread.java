@@ -15,10 +15,9 @@ import com.microsoft.kafkaavailability.*;
 import com.microsoft.kafkaavailability.discovery.CommonUtils;
 import com.microsoft.kafkaavailability.metrics.AvailabilityGauge;
 import com.microsoft.kafkaavailability.metrics.MetricNameEncoded;
-import com.microsoft.kafkaavailability.reporters.ScheduledReporterCollector;
 import com.microsoft.kafkaavailability.properties.AppProperties;
-import com.microsoft.kafkaavailability.properties.ConsumerProperties;
 import com.microsoft.kafkaavailability.properties.MetaDataManagerProperties;
+import com.microsoft.kafkaavailability.reporters.ScheduledReporterCollector;
 import org.apache.curator.framework.CuratorFramework;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -38,24 +37,24 @@ public class ConsumerThread implements Callable<Long> {
 
     private final ScheduledReporterCollector reporterCollector;
     private final CuratorFramework m_curatorFramework;
+    private final ServiceSpecProvider serviceSpecProvider;
 
     private Phaser m_phaser;
     private List<String> m_listServers;
-    private String m_serviceSpec;
     private long m_threadSleepTime;
 
     @Inject
     public ConsumerThread(CuratorFramework curatorFramework, ScheduledReporterCollector reporterCollector,
-                          @Assisted  Phaser phaser, @Assisted List<String> listServers, @Assisted String serviceSpec,
-                          @Assisted long threadSleepTime) {
+                          ServiceSpecProvider serviceSpecProvider, @Assisted  Phaser phaser,
+                          @Assisted List<String> listServers, @Assisted long threadSleepTime) {
         this.m_curatorFramework = curatorFramework;
         this.reporterCollector = reporterCollector;
+        this.serviceSpecProvider = serviceSpecProvider;
 
         this.m_phaser = phaser;
         this.m_phaser.register(); //Registers/Add a new unArrived party to this phaser.
         CommonUtils.dumpPhaserState("After registration of ConsumerThread", phaser);
         m_listServers = listServers;
-        m_serviceSpec = serviceSpec;
         this.m_threadSleepTime = threadSleepTime;
     }
 
@@ -104,7 +103,6 @@ public class ConsumerThread implements Callable<Long> {
 
         m_logger.info("Starting ConsumerLatency");
 
-        IPropertiesManager consumerPropertiesManager = new PropertiesManager<ConsumerProperties>("consumerProperties.json", ConsumerProperties.class);
         IPropertiesManager metaDataPropertiesManager = new PropertiesManager<MetaDataManagerProperties>("metadatamanagerProperties.json", MetaDataManagerProperties.class);
         IMetaDataManager metaDataManager = new MetaDataManager(m_curatorFramework, metaDataPropertiesManager);
 
@@ -129,14 +127,13 @@ public class ConsumerThread implements Callable<Long> {
 
         for (kafka.javaapi.TopicMetadata topic : totalTopicMetadata) {
             //Log the server/topic mapping to know which topic is getting  by which instance of KAT-List<String>
-            int topicPosition = -1;
-            String client = "";
-            int serverIndex = -1;
-            topicPosition = totalTopicMetadata.indexOf(topic);
-            serverIndex = (totalTopicMetadata.indexOf(topic) % m_listServers.size());
-            client = m_listServers.get(serverIndex);
+            int topicIndex = totalTopicMetadata.indexOf(topic);
+            int serverIndex = (topicIndex % m_listServers.size());
+            String client = m_listServers.get(serverIndex);
 
-            if (serverIndex == m_listServers.indexOf(m_serviceSpec)) {
+            String serviceSpec = serviceSpecProvider.getServiceSpec();
+
+            if (serverIndex == m_listServers.indexOf(serviceSpec)) {
                 allTopicMetadata.add(topic);
             }
             rString.append(sep).append(topic.topic() + "-->" + client);
