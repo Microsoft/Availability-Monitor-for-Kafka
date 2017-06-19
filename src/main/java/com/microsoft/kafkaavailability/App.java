@@ -20,7 +20,6 @@ import com.microsoft.kafkaavailability.module.ThreadsModule;
 import com.microsoft.kafkaavailability.properties.AppProperties;
 import com.microsoft.kafkaavailability.properties.MetaDataManagerProperties;
 import com.microsoft.kafkaavailability.threads.HeartBeat;
-import com.microsoft.kafkaavailability.threads.HeartBeatFactory;
 import com.microsoft.kafkaavailability.threads.JobManager;
 import com.microsoft.kafkaavailability.threads.ThreadFactory;
 import org.apache.commons.cli.*;
@@ -61,6 +60,7 @@ public class App {
 
         CommandLineParser parser = new DefaultParser();
         HelpFormatter formatter = new HelpFormatter();
+        HeartBeat heartBeat = null;
 
         try {
             // parse the command line arguments
@@ -84,7 +84,7 @@ public class App {
 
             final CuratorManager curatorManager = injector.getInstance(CuratorManager.class);
             final ThreadFactory threadFactory = injector.getInstance(ThreadFactory.class);
-            final HeartBeatFactory heartBeatFactory = injector.getInstance(HeartBeatFactory.class);
+            heartBeat = injector.getInstance(HeartBeat.class);
 
             MDC.put("cluster", appProperties.environmentName);
             MDC.put("computerName", computerName);
@@ -93,17 +93,18 @@ public class App {
                 m_sleepTime = Integer.parseInt(line.getOptionValue("sleep"));
             }
 
+            heartBeat.start();
             if (line.hasOption("run")) {
                 howManyRuns = Integer.parseInt(line.getOptionValue("run"));
                 for (int i = 0; i < howManyRuns; i++) {
                     waitForChanges(curatorManager);
-                    runOnce(threadFactory, heartBeatFactory);
+                    runOnce(threadFactory);
                     Thread.sleep(m_sleepTime);
                 }
             } else {
                 while (true) {
                     waitForChanges(curatorManager);
-                    runOnce(threadFactory, heartBeatFactory);
+                    runOnce(threadFactory);
                     Thread.sleep(m_sleepTime);
                 }
             }
@@ -113,7 +114,12 @@ public class App {
             formatter.printHelp("KafkaAvailability", options);
         } catch (Exception e) {
             m_logger.error(e.getMessage(), e);
+        } finally {
+            if (heartBeat != null) {
+               heartBeat.stop();
+            }
         }
+
         //used to run shutdown hooks before the program quits. The shutdown hooks (if properly set up) take care of doing all necessary shutdown ceremonies such as closing files, releasing resources etc.
         System.exit(0);
     }
@@ -134,12 +140,7 @@ public class App {
         }
     }
 
-    private static void runOnce(ThreadFactory threadFactory, HeartBeatFactory heartBeatFactory) throws IOException, MetaDataManagerException {
-
-        //default to 1 minute, if not configured
-        long heartBeatIntervalInSeconds = (appProperties.heartBeatIntervalInSeconds > 0 ? appProperties.heartBeatIntervalInSeconds : 60);
-        HeartBeat beat = heartBeatFactory.createHeartBeat(heartBeatIntervalInSeconds);
-        beat.start();
+    private static void runOnce(ThreadFactory threadFactory) throws IOException, MetaDataManagerException {
 
         /** The phaser is a nice synchronization barrier. */
         final Phaser phaser = new Phaser(1) {
@@ -265,7 +266,6 @@ public class App {
         phaser.arriveAndDeregister();
         //CommonUtils.dumpPhaserState("After main thread arrived and deregistered", phaser);
 
-        beat.stop();
         m_logger.info("All Finished.");
     }
 }

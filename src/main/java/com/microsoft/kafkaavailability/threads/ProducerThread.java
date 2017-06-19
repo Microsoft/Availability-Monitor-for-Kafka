@@ -46,6 +46,7 @@ public class ProducerThread implements Callable<Long> {
     public ProducerThread(CuratorFramework curatorFramework, ScheduledReporterCollector reporterCollector,
                           @Assisted Phaser phaser, @Assisted long threadSleepTime) {
         this.reporterCollector = reporterCollector;
+        this.reporterCollector.start();
         this.m_curatorFramework = curatorFramework;
 
         this.m_phaser = phaser;
@@ -67,7 +68,6 @@ public class ProducerThread implements Callable<Long> {
                     + "Phase-" + m_phaser.getPhase());
 
             try {
-                reporterCollector.start();
                 metrics = reporterCollector.getRegistry();
                 runProducer(metrics);
             } catch (Exception e) {
@@ -76,7 +76,6 @@ public class ProducerThread implements Callable<Long> {
                 try {
                     reporterCollector.report();
                     CommonUtils.sleep(1000);
-                    reporterCollector.stop();
                 } catch (Exception e) {
                     m_logger.error(e.getMessage(), e);
                 }
@@ -95,6 +94,8 @@ public class ProducerThread implements Callable<Long> {
             }
             //phaser.arriveAndAwaitAdvance();
         } while (!m_phaser.isTerminated());
+
+        reporterCollector.stop();
         m_logger.info("ProducerThread (run()) has been COMPLETED.");
         return Long.valueOf(elapsedTime);
     }

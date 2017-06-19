@@ -7,8 +7,6 @@ package com.microsoft.kafkaavailability.threads;
 
 import com.codahale.metrics.MetricRegistry;
 import com.google.gson.Gson;
-import com.google.inject.Inject;
-import com.google.inject.assistedinject.Assisted;
 import com.microsoft.kafkaavailability.metrics.AvailabilityGauge;
 import com.microsoft.kafkaavailability.metrics.MetricNameEncoded;
 import com.microsoft.kafkaavailability.reporters.ScheduledReporterCollector;
@@ -21,8 +19,7 @@ public class HeartBeatThread implements Runnable {
     private final ScheduledReporterCollector reporterCollector;
     private final String serverName;
 
-    @Inject
-    public HeartBeatThread(ScheduledReporterCollector reporterCollector, @Assisted String serverName) {
+    public HeartBeatThread(ScheduledReporterCollector reporterCollector, String serverName) {
         this.reporterCollector = reporterCollector;
         this.serverName = serverName;
     }
@@ -31,8 +28,6 @@ public class HeartBeatThread implements Runnable {
     public void run() {
         MetricRegistry metrics;
         try {
-
-            reporterCollector.start();
             metrics = reporterCollector.getRegistry();
 
             MetricNameEncoded heartbeatAvailability = new MetricNameEncoded("Heartbeat", serverName);
@@ -43,12 +38,6 @@ public class HeartBeatThread implements Runnable {
             logger.debug(String.format("Heartbeat/progress sent for %s", serverName));
         } catch (Exception e) {
             logger.error(e.getMessage(), e);
-        } finally {
-            try {
-                reporterCollector.stop();
-            } catch (Exception e) {
-                logger.error(e.getMessage(), e);
-            }
         }
     }
 }

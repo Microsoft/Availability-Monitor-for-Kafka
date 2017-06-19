@@ -1,5 +1,6 @@
 package com.microsoft.kafkaavailability.module;
 
+import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import com.google.inject.AbstractModule;
 import com.google.inject.Provides;
 import com.google.inject.Singleton;
@@ -12,7 +13,6 @@ import com.microsoft.kafkaavailability.discovery.CuratorClient;
 import com.microsoft.kafkaavailability.discovery.CuratorManager;
 import com.microsoft.kafkaavailability.properties.AppProperties;
 import com.microsoft.kafkaavailability.properties.MetaDataManagerProperties;
-import com.microsoft.kafkaavailability.threads.HeartBeatFactory;
 import com.microsoft.kafkaavailability.threads.ServiceSpecProvider;
 import com.microsoft.kafkaavailability.threads.ThreadFactory;
 import org.apache.curator.framework.CuratorFramework;
@@ -20,16 +20,19 @@ import org.apache.curator.framework.imps.CuratorFrameworkState;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+
 public class ThreadsModule extends AbstractModule {
     private final static Logger LOGGER = LoggerFactory.getLogger(ThreadsModule.class);
 
     @Override
     protected void configure() {
         bindConstant().annotatedWith(Names.named("localIPAddress")).to(CommonUtils.getIpAddress());
+        bindConstant().annotatedWith(Names.named("localHostName")).to(CommonUtils.getComputerName());
         bindConstant().annotatedWith(Names.named("curatorPort")).to((int) (65535 * Math.random()));
 
         install(new FactoryModuleBuilder().build(ThreadFactory.class));
-        install(new FactoryModuleBuilder().build(HeartBeatFactory.class));
     }
 
     @Provides
@@ -68,5 +71,14 @@ public class ThreadsModule extends AbstractModule {
     @Singleton
     public CuratorFramework curatorFramework(MetaDataManagerProperties metaDataManagerProperties) {
         return CuratorClient.getCuratorFramework(metaDataManagerProperties.zooKeeperHosts);
+    }
+
+    @Provides
+    @Named("hearBeatExecutorService")
+    public ScheduledExecutorService hearBeatExecutorService() {
+        return Executors.newSingleThreadScheduledExecutor(
+                new ThreadFactoryBuilder()
+                        .setNameFormat("HeartBeat-Thread")
+                        .build());
     }
 }
