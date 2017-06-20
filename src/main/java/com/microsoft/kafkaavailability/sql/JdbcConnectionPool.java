@@ -5,18 +5,19 @@
 
 package com.microsoft.kafkaavailability.sql;
 
+import com.microsoft.kafkaavailability.exception.SQLConnectionInterruptedException;
 import org.slf4j.LoggerFactory;
 
+import javax.sql.ConnectionEvent;
+import javax.sql.ConnectionEventListener;
+import javax.sql.ConnectionPoolDataSource;
+import javax.sql.PooledConnection;
 import java.security.InvalidParameterException;
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.util.*;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
-import javax.sql.ConnectionEvent;
-import javax.sql.ConnectionEventListener;
-import javax.sql.ConnectionPoolDataSource;
-import javax.sql.PooledConnection;
 
 /**
  * A lightweight standalone JDBC connection pool manager.
@@ -260,8 +261,8 @@ public class JdbcConnectionPool {
             if (!semaphore.tryAcquire(timeout, TimeUnit.SECONDS))
                 throw new TimeoutException();
         } catch (InterruptedException e) {
-            throw new RuntimeException(
-                    "Interrupted while waiting for a database connection.", e);
+            throw new SQLConnectionInterruptedException(
+                    "Interrupted while waiting for a database connection.");
         }
         boolean ok = false;
         try {

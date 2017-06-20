@@ -8,6 +8,7 @@ package com.microsoft.kafkaavailability.reporters;
 import com.codahale.metrics.*;
 import com.codahale.metrics.Timer;
 import com.google.gson.Gson;
+import com.microsoft.kafkaavailability.exception.SQLConnectionInterruptedException;
 import com.microsoft.kafkaavailability.metrics.MetricNameEncoded;
 import com.microsoft.kafkaavailability.sql.JdbcConnectionPool;
 import org.slf4j.Logger;
@@ -301,6 +302,9 @@ public class SqlReporter extends ScheduledReporter {
                     }
                 } catch (java.sql.SQLException e) {
                     logSQLException(e);
+                } catch (SQLConnectionInterruptedException e) {
+                    //It's fine to be interrupted in most case, e.g. when application is terminating
+                    m_logger.warn("SQL connection got interrupted");
                 } catch (Exception e) {
                     m_logger.error(e.getMessage(), e);
                 } finally {
