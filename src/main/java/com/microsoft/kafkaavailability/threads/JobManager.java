@@ -36,12 +36,15 @@ public class JobManager implements Callable<Long> {
         try {
             future = executorService.submit(job);
             elapsedTime = future.get(timeout, timeUnit);
-        } catch (InterruptedException | ExecutionException | TimeoutException e) {
+        } catch (ExecutionException | TimeoutException e) {
             if (e instanceof TimeoutException) {
                 m_logger.error("Thread Timeout of " + timeout + " " + timeUnit + " occurred for " + job.toString() + " Cancelling the thread:" + threadName);
             } else {
                 m_logger.error("Exception occurred for " + job.toString() + " : " + e);
             }
+        } catch (InterruptedException e) {
+            //In most cases, it's fine to be interrupted, e.g. when main thread is terminating
+            m_logger.warn(job.toString() + " got interrupted.");
         } catch (Exception e) {
             m_logger.error("Unexpected exception occurred for " + job.toString() + " : " + e);
 
