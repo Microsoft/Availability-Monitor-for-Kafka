@@ -128,13 +128,13 @@ To make use of this feature, define new module class in reporter package and ann
 Runtime variables can be passed to reporter package through Guice, see below as an example.
 
 ```
-    @Override
-    protected void configure() {
-        bind(String.class).annotatedWith(Names.named("environmentName")).toInstance(appProperties.environmentName);
-        bind(String.class).annotatedWith(Names.named("statsdEndpoint")).toInstance(reporterProperties.statsdEndpoint);
-        bind(Integer.class).annotatedWith(Names.named("statsdPort")).toInstance(reporterProperties.statsdPort);
-        bind(String.class).annotatedWith(Names.named("metricsNamespace")).toInstance(reporterProperties.metricsNamespace);
-    }
+       @Override
+       protected void configure() {
+           bind(String.class).annotatedWith(Names.named(ENVIRONMENT_NAME_CONSTANT_NAME)).toInstance(appProperties.environmentName);
+           bind(String.class).annotatedWith(Names.named(STATSD_ENDPOINT_CONSTANT_NAME)).toInstance(reporterProperties.statsdEndpoint);
+           bind(Integer.class).annotatedWith(Names.named(STATSD_PORT_CONSTANT_NAME)).toInstance(reporterProperties.statsdPort);
+           bind(String.class).annotatedWith(Names.named(METRICS_NAMESPACE_CONSTANT_NAME)).toInstance(reporterProperties.metricsNamespace);
+       }
 ```
 
 Access these variables in reporter package through injection.

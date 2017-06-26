@@ -27,18 +27,22 @@ import java.util.concurrent.ScheduledExecutorService;
 public class MonitorTasksModule extends AbstractModule {
     private final static Logger LOGGER = LoggerFactory.getLogger(MonitorTasksModule.class);
 
+    public static final String LOCAL_IP_CONSTANT_NAME = "localIPAddress";
+    public static final String LOCAL_HOST_NAME_CONSTANT_NAME = "localHostName";
+    public static final String CURATOR_PORT_CONSTANT_NAME = "curatorPort";
+
     @Override
     protected void configure() {
-        bindConstant().annotatedWith(Names.named("localIPAddress")).to(CommonUtils.getIpAddress());
-        bindConstant().annotatedWith(Names.named("localHostName")).to(CommonUtils.getComputerName());
-        bindConstant().annotatedWith(Names.named("curatorPort")).to(generateCuratorPort());
+        bindConstant().annotatedWith(Names.named(LOCAL_IP_CONSTANT_NAME)).to(CommonUtils.getIpAddress());
+        bindConstant().annotatedWith(Names.named(LOCAL_HOST_NAME_CONSTANT_NAME)).to(CommonUtils.getComputerName());
+        bindConstant().annotatedWith(Names.named(CURATOR_PORT_CONSTANT_NAME)).to(generateCuratorPort());
 
         install(new FactoryModuleBuilder().build(MonitorTaskFactory.class));
     }
 
     @Provides
     @Singleton
-    public CuratorManager curatorManager(@Named("localIPAddress") String localIPAddress,
+    public CuratorManager curatorManager(@Named(MonitorTasksModule.LOCAL_IP_CONSTANT_NAME) String localIPAddress,
                                          ServiceSpecProvider serviceSpecProvider, final CuratorFramework curatorFramework,
                                          AppProperties appProperties) {
 

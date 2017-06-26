@@ -19,6 +19,11 @@ import java.util.concurrent.TimeUnit;
 
 public class ReportersModule extends AbstractModule {
 
+    public static final String ENVIRONMENT_NAME_CONSTANT_NAME = "environmentName";
+    public static final String STATSD_ENDPOINT_CONSTANT_NAME = "statsdEndpoint";
+    public static final String STATSD_PORT_CONSTANT_NAME = "statsdPort";
+    public static final String METRICS_NAMESPACE_CONSTANT_NAME = "metricsNamespace";
+
     @Inject
     private AppProperties appProperties;
     @Inject
@@ -28,10 +33,10 @@ public class ReportersModule extends AbstractModule {
 
     @Override
     protected void configure() {
-        bind(String.class).annotatedWith(Names.named("environmentName")).toInstance(appProperties.environmentName);
-        bind(String.class).annotatedWith(Names.named("statsdEndpoint")).toInstance(reporterProperties.statsdEndpoint);
-        bind(Integer.class).annotatedWith(Names.named("statsdPort")).toInstance(reporterProperties.statsdPort);
-        bind(String.class).annotatedWith(Names.named("metricsNamespace")).toInstance(reporterProperties.metricsNamespace);
+        bind(String.class).annotatedWith(Names.named(ENVIRONMENT_NAME_CONSTANT_NAME)).toInstance(appProperties.environmentName);
+        bind(String.class).annotatedWith(Names.named(STATSD_ENDPOINT_CONSTANT_NAME)).toInstance(reporterProperties.statsdEndpoint);
+        bind(Integer.class).annotatedWith(Names.named(STATSD_PORT_CONSTANT_NAME)).toInstance(reporterProperties.statsdPort);
+        bind(String.class).annotatedWith(Names.named(METRICS_NAMESPACE_CONSTANT_NAME)).toInstance(reporterProperties.metricsNamespace);
     }
 
     @ProvidesIntoMap

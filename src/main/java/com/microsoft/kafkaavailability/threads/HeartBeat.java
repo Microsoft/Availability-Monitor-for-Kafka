@@ -7,6 +7,7 @@ package com.microsoft.kafkaavailability.threads;
 
 import com.google.inject.Inject;
 import com.google.inject.name.Named;
+import com.microsoft.kafkaavailability.module.MonitorTasksModule;
 import com.microsoft.kafkaavailability.properties.AppProperties;
 import com.microsoft.kafkaavailability.reporters.ScheduledReporterCollector;
 import org.slf4j.Logger;
@@ -28,7 +29,7 @@ public class HeartBeat {
 
     @Inject
     public HeartBeat(ScheduledReporterCollector scheduledReporterCollector, AppProperties appProperties,
-                     @Named("localHostName") String localHostName,
+                     @Named(MonitorTasksModule.LOCAL_HOST_NAME_CONSTANT_NAME) String localHostName,
                      @Named("hearBeatExecutorService") ScheduledExecutorService scheduledExecutorService) {
 
         this.scheduledReporterCollector = scheduledReporterCollector;
