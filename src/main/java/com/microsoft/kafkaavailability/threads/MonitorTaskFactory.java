@@ -3,7 +3,7 @@ package com.microsoft.kafkaavailability.threads;
 import java.util.List;
 import java.util.concurrent.Phaser;
 
-public interface ThreadFactory {
+public interface MonitorTaskFactory {
     AvailabilityThread createAvailabilityThread(Phaser phaser, long threadSleepTime);
     ProducerThread createProducerThread(Phaser phaser, long threadSleepTime);
     ConsumerThread createConsumerThread(Phaser phaser, List<String> listServers, long threadSleepTime);

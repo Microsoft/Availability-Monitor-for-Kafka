@@ -52,6 +52,6 @@ public class ModuleScanner {
     }
 
     private static boolean isKnownType(Class<? extends AbstractModule> moduleClass) {
-        return moduleClass.equals(AppModule.class) || moduleClass.equals(ReportersModule.class) || moduleClass.equals(ThreadsModule.class);
+        return moduleClass.equals(AppModule.class) || moduleClass.equals(ReportersModule.class) || moduleClass.equals(MonitorTasksModule.class);
     }
 }

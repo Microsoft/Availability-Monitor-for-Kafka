@@ -16,12 +16,12 @@ import com.microsoft.kafkaavailability.discovery.CuratorManager;
 import com.microsoft.kafkaavailability.module.AppModule;
 import com.microsoft.kafkaavailability.module.ModuleScanner;
 import com.microsoft.kafkaavailability.module.ReportersModule;
-import com.microsoft.kafkaavailability.module.ThreadsModule;
+import com.microsoft.kafkaavailability.module.MonitorTasksModule;
 import com.microsoft.kafkaavailability.properties.AppProperties;
 import com.microsoft.kafkaavailability.properties.MetaDataManagerProperties;
 import com.microsoft.kafkaavailability.threads.HeartBeat;
 import com.microsoft.kafkaavailability.threads.JobManager;
-import com.microsoft.kafkaavailability.threads.ThreadFactory;
+import com.microsoft.kafkaavailability.threads.MonitorTaskFactory;
 import org.apache.commons.cli.*;
 import org.apache.log4j.MDC;
 import org.slf4j.Logger;
@@ -73,7 +73,7 @@ public class App {
             ImmutableSet<Module> allGuiceModules = ImmutableSet.<Module>builder()
                     .add(MultibindingsScanner.asModule())
                     .add(parent.getInstance(ReportersModule.class))
-                    .add(parent.getInstance(ThreadsModule.class))
+                    .add(parent.getInstance(MonitorTasksModule.class))
                     .addAll(ModuleScanner.getModulesFromDependencies())
                     .build();
 
@@ -83,7 +83,7 @@ public class App {
             metaDataProperties = injector.getInstance(MetaDataManagerProperties.class);
 
             final CuratorManager curatorManager = injector.getInstance(CuratorManager.class);
-            final ThreadFactory threadFactory = injector.getInstance(ThreadFactory.class);
+            final MonitorTaskFactory monitorTaskFactory = injector.getInstance(MonitorTaskFactory.class);
             heartBeat = injector.getInstance(HeartBeat.class);
 
             MDC.put("cluster", appProperties.environmentName);
@@ -98,13 +98,13 @@ public class App {
                 howManyRuns = Integer.parseInt(line.getOptionValue("run"));
                 for (int i = 0; i < howManyRuns; i++) {
                     waitForChanges(curatorManager);
-                    runOnce(threadFactory);
+                    runOnce(monitorTaskFactory);
                     Thread.sleep(m_sleepTime);
                 }
             } else {
                 while (true) {
                     waitForChanges(curatorManager);
-                    runOnce(threadFactory);
+                    runOnce(monitorTaskFactory);
                     Thread.sleep(m_sleepTime);
                 }
             }
@@ -140,7 +140,7 @@ public class App {
         }
     }
 
-    private static void runOnce(ThreadFactory threadFactory) throws IOException, MetaDataManagerException {
+    private static void runOnce(MonitorTaskFactory monitorTaskFactory) throws IOException, MetaDataManagerException {
 
         /** The phaser is a nice synchronization barrier. */
         final Phaser phaser = new Phaser(1) {
@@ -203,10 +203,10 @@ public class App {
         ConsumerThread usually takes longer to finish as it has to initiate multiple child threads for consuming data from each topic and partition.
         Adding one extra minute to other threads so that they can finish the current execution (they perform same operation multiple times) otherwise they may also get get interupted.
          */
-        JobManager LeaderInfoJob = new JobManager(mainThreadsTimeoutInSeconds , TimeUnit.SECONDS, threadFactory.createLeaderInfoThread(phaser, leaderInfoThreadSleepTime), "LeaderInfoThread");
-        JobManager ProducerJob = new JobManager(mainThreadsTimeoutInSeconds , TimeUnit.SECONDS, threadFactory.createProducerThread(phaser, producerThreadSleepTime), "ProducerThread");
-        JobManager AvailabilityJob = new JobManager(mainThreadsTimeoutInSeconds , TimeUnit.SECONDS, threadFactory.createAvailabilityThread(phaser, availabilityThreadSleepTime), "AvailabilityThread");
-        JobManager ConsumerJob = new JobManager(mainThreadsTimeoutInSeconds, TimeUnit.SECONDS, threadFactory.createConsumerThread(phaser, listServers, consumerThreadSleepTime), "ConsumerThread");
+        JobManager LeaderInfoJob = new JobManager(mainThreadsTimeoutInSeconds , TimeUnit.SECONDS, monitorTaskFactory.createLeaderInfoThread(phaser, leaderInfoThreadSleepTime), "LeaderInfoThread");
+        JobManager ProducerJob = new JobManager(mainThreadsTimeoutInSeconds , TimeUnit.SECONDS, monitorTaskFactory.createProducerThread(phaser, producerThreadSleepTime), "ProducerThread");
+        JobManager AvailabilityJob = new JobManager(mainThreadsTimeoutInSeconds , TimeUnit.SECONDS, monitorTaskFactory.createAvailabilityThread(phaser, availabilityThreadSleepTime), "AvailabilityThread");
+        JobManager ConsumerJob = new JobManager(mainThreadsTimeoutInSeconds, TimeUnit.SECONDS, monitorTaskFactory.createConsumerThread(phaser, listServers, consumerThreadSleepTime), "ConsumerThread");
 
         service.submit(LeaderInfoJob);
         service.submit(ProducerJob);

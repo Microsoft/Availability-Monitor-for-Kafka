@@ -38,7 +38,7 @@ public class AppModule extends AbstractModule {
         bind(MetricRegistry.class).toInstance(new MetricRegistry());
 
         bind(ReportersModule.class);
-        bind(ThreadsModule.class);
+        bind(MonitorTasksModule.class);
     }
 
     @Provides

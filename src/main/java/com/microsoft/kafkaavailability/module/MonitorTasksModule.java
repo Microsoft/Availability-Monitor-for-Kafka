@@ -14,7 +14,7 @@ import com.microsoft.kafkaavailability.discovery.CuratorManager;
 import com.microsoft.kafkaavailability.properties.AppProperties;
 import com.microsoft.kafkaavailability.properties.MetaDataManagerProperties;
 import com.microsoft.kafkaavailability.threads.ServiceSpecProvider;
-import com.microsoft.kafkaavailability.threads.ThreadFactory;
+import com.microsoft.kafkaavailability.threads.MonitorTaskFactory;
 import org.apache.curator.framework.CuratorFramework;
 import org.apache.curator.framework.imps.CuratorFrameworkState;
 import org.slf4j.Logger;
@@ -23,8 +23,8 @@ import org.slf4j.LoggerFactory;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 
-public class ThreadsModule extends AbstractModule {
-    private final static Logger LOGGER = LoggerFactory.getLogger(ThreadsModule.class);
+public class MonitorTasksModule extends AbstractModule {
+    private final static Logger LOGGER = LoggerFactory.getLogger(MonitorTasksModule.class);
 
     @Override
     protected void configure() {
@@ -32,7 +32,7 @@ public class ThreadsModule extends AbstractModule {
         bindConstant().annotatedWith(Names.named("localHostName")).to(CommonUtils.getComputerName());
         bindConstant().annotatedWith(Names.named("curatorPort")).to((int) (65535 * Math.random()));
 
-        install(new FactoryModuleBuilder().build(ThreadFactory.class));
+        install(new FactoryModuleBuilder().build(MonitorTaskFactory.class));
     }
 
     @Provides
