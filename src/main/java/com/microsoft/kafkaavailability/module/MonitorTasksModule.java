@@ -13,13 +13,14 @@ import com.microsoft.kafkaavailability.discovery.CuratorClient;
 import com.microsoft.kafkaavailability.discovery.CuratorManager;
 import com.microsoft.kafkaavailability.properties.AppProperties;
 import com.microsoft.kafkaavailability.properties.MetaDataManagerProperties;
-import com.microsoft.kafkaavailability.threads.ServiceSpecProvider;
 import com.microsoft.kafkaavailability.threads.MonitorTaskFactory;
+import com.microsoft.kafkaavailability.threads.ServiceSpecProvider;
 import org.apache.curator.framework.CuratorFramework;
 import org.apache.curator.framework.imps.CuratorFrameworkState;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.Random;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 
@@ -30,7 +31,7 @@ public class MonitorTasksModule extends AbstractModule {
     protected void configure() {
         bindConstant().annotatedWith(Names.named("localIPAddress")).to(CommonUtils.getIpAddress());
         bindConstant().annotatedWith(Names.named("localHostName")).to(CommonUtils.getComputerName());
-        bindConstant().annotatedWith(Names.named("curatorPort")).to((int) (65535 * Math.random()));
+        bindConstant().annotatedWith(Names.named("curatorPort")).to(generateCuratorPort());
 
         install(new FactoryModuleBuilder().build(MonitorTaskFactory.class));
     }
@@ -80,5 +81,9 @@ public class MonitorTasksModule extends AbstractModule {
                 new ThreadFactoryBuilder()
                         .setNameFormat("HeartBeat-Thread")
                         .build());
+    }
+
+    private int generateCuratorPort() {
+        return 20000 + new Random().nextInt(10000);
     }
 }
