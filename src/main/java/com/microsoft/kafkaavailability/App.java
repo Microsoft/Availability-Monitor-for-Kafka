@@ -47,7 +47,6 @@ public class App {
     static List<String> listServers;
 
     private static String computerName = CommonUtils.getComputerName();
-    private static String serviceSpec = "";
 
     public static void main(String[] args) throws IOException, MetaDataManagerException, InterruptedException {
         m_logger.info("Starting KafkaAvailability Tool");

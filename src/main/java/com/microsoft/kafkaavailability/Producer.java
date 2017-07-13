@@ -35,7 +35,7 @@ public class Producer implements IProducer {
     private IMetaDataManager m_metaDataManager;
     private ProducerProperties producerProperties;
     private kafka.javaapi.producer.Producer<String, String> m_producer;
-    private static SSLSocketFactory m_sslSocketFactory = null;
+    private static SSLSocketFactory sslSocketFactory = null;
 
     /***
      * @param propManager     Used to get properties from json file
@@ -105,8 +105,16 @@ public class Producer implements IProducer {
             try {
                 con = (HttpsURLConnection) obj.openConnection();
 
-                SSLSocketFactory sslSocketFactory = createSSLSocketFactory(useCertToConnect, keyStorePath, keyStorePassword);
+                // Create the socket factory.
+                // Reusing the same socket factory allows sockets to be
+                // reused, supporting persistent connections.
+                if(sslSocketFactory == null) {
+                    sslSocketFactory = createSSLSocketFactory(useCertToConnect, keyStorePath, keyStorePassword);
+                }
                 con.setSSLSocketFactory(sslSocketFactory);
+
+                // Since we may be using a cert with a different name, we need to ignore
+                // the hostname as well.
                 con.setHostnameVerifier(ALL_TRUSTING_HOSTNAME_VERIFIER);
                 //add request header
                 con.setRequestMethod("POST");
@@ -163,7 +171,7 @@ public class Producer implements IProducer {
     }
 
     private SSLSocketFactory createSSLSocketFactory(boolean useKeyStoreToConnect, String keyStorePath,
-                                                    String keyStorePassword) throws KeyStoreException, UnrecoverableKeyException, KeyManagementException, NoSuchAlgorithmException {
+                                                    String keyStorePassword) throws Exception {
 
         //Only load KeyStore when it's needed to connect to IP, SSLContext is fine with KeyStore being null otherwise.
         KeyStore trustStore = null;

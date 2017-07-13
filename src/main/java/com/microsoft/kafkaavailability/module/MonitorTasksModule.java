@@ -30,6 +30,7 @@ public class MonitorTasksModule extends AbstractModule {
     public static final String LOCAL_IP_CONSTANT_NAME = "localIPAddress";
     public static final String LOCAL_HOST_NAME_CONSTANT_NAME = "localHostName";
     public static final String CURATOR_PORT_CONSTANT_NAME = "curatorPort";
+    public static final String HEART_BEAT_EXECUTOR_SERVICE = "heartBeatExecutorService";
 
     @Override
     protected void configure() {
@@ -79,7 +80,7 @@ public class MonitorTasksModule extends AbstractModule {
     }
 
     @Provides
-    @Named("hearBeatExecutorService")
+    @Named(HEART_BEAT_EXECUTOR_SERVICE)
     public ScheduledExecutorService hearBeatExecutorService() {
         return Executors.newSingleThreadScheduledExecutor(
                 new ThreadFactoryBuilder()

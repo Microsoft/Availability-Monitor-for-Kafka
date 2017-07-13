@@ -93,20 +93,6 @@ public class ScheduledReporterCollector {
                 reporterIterator.next().stop();
             }
         }
-
-        removeAll();
-    }
-
-    /**
-     * Remove all metrics from the registry
-     */
-    public void removeAll() {
-        getRegistry().removeMatching(new MetricFilter() {
-            @Override
-            public boolean matches(String arg0, Metric arg1) {
-                return true;
-            }
-        });
     }
 
     /**

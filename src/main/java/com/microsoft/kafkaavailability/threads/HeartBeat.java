@@ -30,7 +30,7 @@ public class HeartBeat {
     @Inject
     public HeartBeat(ScheduledReporterCollector scheduledReporterCollector, AppProperties appProperties,
                      @Named(MonitorTasksModule.LOCAL_HOST_NAME_CONSTANT_NAME) String localHostName,
-                     @Named("hearBeatExecutorService") ScheduledExecutorService scheduledExecutorService) {
+                     @Named(MonitorTasksModule.HEART_BEAT_EXECUTOR_SERVICE) ScheduledExecutorService scheduledExecutorService) {
 
         this.scheduledReporterCollector = scheduledReporterCollector;
         //default to 1 minute, if not configured
