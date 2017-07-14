@@ -5,9 +5,13 @@ import com.codahale.metrics.MetricRegistry;
 import com.codahale.metrics.ScheduledReporter;
 import com.google.inject.AbstractModule;
 import com.google.inject.Inject;
+import com.google.inject.Provides;
+import com.google.inject.Singleton;
 import com.google.inject.multibindings.ProvidesIntoMap;
 import com.google.inject.multibindings.StringMapKey;
 import com.google.inject.name.Names;
+import com.microsoft.kafkaavailability.discovery.CommonUtils;
+import com.microsoft.kafkaavailability.metrics.MetricNameEncodedFactory;
 import com.microsoft.kafkaavailability.properties.AppProperties;
 import com.microsoft.kafkaavailability.properties.ReporterProperties;
 import com.microsoft.kafkaavailability.reporters.SqlReporter;
@@ -78,5 +82,13 @@ public class ReportersModule extends AbstractModule {
                 .convertRatesTo(TimeUnit.SECONDS)
                 .convertDurationsTo(TimeUnit.SECONDS)
                 .build();
+    }
+
+    @Provides
+    @Singleton
+    public MetricNameEncodedFactory metricNameEncodedFactory() {
+        String localMachineName = CommonUtils.getComputerName();
+
+        return new MetricNameEncodedFactory(appProperties.environmentName, localMachineName);
     }
 }

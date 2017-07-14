@@ -15,6 +15,7 @@ import com.microsoft.kafkaavailability.*;
 import com.microsoft.kafkaavailability.discovery.CommonUtils;
 import com.microsoft.kafkaavailability.metrics.AvailabilityGauge;
 import com.microsoft.kafkaavailability.metrics.MetricNameEncoded;
+import com.microsoft.kafkaavailability.metrics.MetricNameEncodedFactory;
 import com.microsoft.kafkaavailability.reporters.ScheduledReporterCollector;
 import com.microsoft.kafkaavailability.properties.AppProperties;
 import com.microsoft.kafkaavailability.properties.MetaDataManagerProperties;
@@ -34,20 +35,23 @@ import static com.microsoft.kafkaavailability.discovery.Constants.DEFAULT_ELAPSE
 
 public class ProducerThread implements Callable<Long> {
 
-    final static Logger m_logger = LoggerFactory.getLogger(ProducerThread.class);
+    private final static Logger LOGGER = LoggerFactory.getLogger(ProducerThread.class);
 
     private final ScheduledReporterCollector reporterCollector;
     private final CuratorFramework m_curatorFramework;
+    private final MetricNameEncodedFactory metricNameFactory;
 
     private Phaser m_phaser;
     private long m_threadSleepTime;
 
     @Inject
     public ProducerThread(CuratorFramework curatorFramework, ScheduledReporterCollector reporterCollector,
+                          MetricNameEncodedFactory metricNameFactory,
                           @Assisted Phaser phaser, @Assisted long threadSleepTime) {
         this.reporterCollector = reporterCollector;
         this.reporterCollector.start();
         this.m_curatorFramework = curatorFramework;
+        this.metricNameFactory = metricNameFactory;
 
         this.m_phaser = phaser;
         //this.m_phaser.register(); //Registers/Add a new unArrived party to this phaser.
@@ -63,7 +67,7 @@ public class ProducerThread implements Callable<Long> {
         do {
             long lStartTime = System.currentTimeMillis();
             MetricRegistry metrics;
-            m_logger.info(Thread.currentThread().getName() +
+            LOGGER.info(Thread.currentThread().getName() +
                     " - Producer party has arrived and is working in "
                     + "Phase-" + m_phaser.getPhase());
 
@@ -71,38 +75,38 @@ public class ProducerThread implements Callable<Long> {
                 metrics = reporterCollector.getRegistry();
                 runProducer(metrics);
             } catch (Exception e) {
-                m_logger.error(e.getMessage(), e);
+                LOGGER.error(e.getMessage(), e);
             } finally {
                 try {
                     reporterCollector.report();
                     CommonUtils.sleep(1000);
                 } catch (Exception e) {
-                    m_logger.error(e.getMessage(), e);
+                    LOGGER.error(e.getMessage(), e);
                 }
             }
 
             elapsedTime = CommonUtils.stopWatch(lStartTime);
-            m_logger.info("Producer Elapsed: " + elapsedTime + " milliseconds.");
+            LOGGER.info("Producer Elapsed: " + elapsedTime + " milliseconds.");
 
             while (elapsedTime < m_threadSleepTime && !m_phaser.isTerminated()) {
                 try {
                     Thread.currentThread().sleep(sleepDuration);
                     elapsedTime = elapsedTime + sleepDuration;
                 } catch (InterruptedException ie) {
-                    m_logger.error(ie.getMessage(), ie);
+                    LOGGER.error(ie.getMessage(), ie);
                 }
             }
             //phaser.arriveAndAwaitAdvance();
         } while (!m_phaser.isTerminated());
 
         reporterCollector.stop();
-        m_logger.info("ProducerThread (run()) has been COMPLETED.");
+        LOGGER.info("ProducerThread (run()) has been COMPLETED.");
         return Long.valueOf(elapsedTime);
     }
 
     private void runProducer(MetricRegistry metrics) throws IOException, MetaDataManagerException {
 
-        m_logger.info("Starting ProducerLatency");
+        LOGGER.info("Starting ProducerLatency");
         IPropertiesManager producerPropertiesManager = new PropertiesManager<ProducerProperties>("producerProperties.json", ProducerProperties.class);
         IPropertiesManager metaDataPropertiesManager = new PropertiesManager<MetaDataManagerProperties>("metadatamanagerProperties.json", MetaDataManagerProperties.class);
         IMetaDataManager metaDataManager = new MetaDataManager(m_curatorFramework, metaDataPropertiesManager);
@@ -134,8 +138,8 @@ public class ProducerThread implements Callable<Long> {
                 }
         }
 
-        m_logger.info("totalTopicMetadata size:" + totalTopicMetadata.size());
-        m_logger.info("canaryTestTopicsMetadata size:" + whiteListTopicMetadata.size());
+        LOGGER.info("totalTopicMetadata size:" + totalTopicMetadata.size());
+        LOGGER.info("canaryTestTopicsMetadata size:" + whiteListTopicMetadata.size());
 
         for (kafka.javaapi.TopicMetadata topic : whiteListTopicMetadata) {
             numPartitionsProducer += topic.partitionsMetadata().size();
@@ -144,13 +148,13 @@ public class ProducerThread implements Callable<Long> {
         final SlidingWindowReservoir producerLatencyWindow = new SlidingWindowReservoir(numPartitionsProducer);
         Histogram histogramProducerLatency = new Histogram(producerLatencyWindow);
 
-        MetricNameEncoded producerLatency = new MetricNameEncoded("Producer.Latency", "all");
+        MetricNameEncoded producerLatency = metricNameFactory.createWithTopic("Producer.Latency", "all");
         if (!metrics.getNames().contains(new Gson().toJson(producerLatency))) {
             if (appProperties.sendProducerLatency)
                 metrics.register(new Gson().toJson(producerLatency), histogramProducerLatency);
         }
 
-        m_logger.info("start topic partition loop");
+        LOGGER.info("start topic partition loop");
 
         for (kafka.javaapi.TopicMetadata item : whiteListTopicMetadata) {
             boolean isTopicAvailable = true;
@@ -158,7 +162,7 @@ public class ProducerThread implements Callable<Long> {
             producerTryCount++;
             final SlidingWindowReservoir topicLatency = new SlidingWindowReservoir(item.partitionsMetadata().size());
             Histogram histogramProducerTopicLatency = new Histogram(topicLatency);
-            MetricNameEncoded producerTopicLatency = new MetricNameEncoded("Producer.Topic.Latency", item.topic());
+            MetricNameEncoded producerTopicLatency = metricNameFactory.createWithTopic("Producer.Topic.Latency", item.topic());
             if (!metrics.getNames().contains(new Gson().toJson(producerTopicLatency))) {
                 if (appProperties.sendProducerTopicLatency)
                     metrics.register(new Gson().toJson(producerTopicLatency), histogramProducerTopicLatency);
@@ -166,8 +170,8 @@ public class ProducerThread implements Callable<Long> {
 
             for (kafka.javaapi.PartitionMetadata part : item.partitionsMetadata()) {
                 int partitionProducerFailCount = 0;
-                m_logger.debug("Writing to Topic: {}; Partition: {};", item.topic(), part.partitionId());
-                MetricNameEncoded producerPartitionLatency = new MetricNameEncoded("Producer.Partition.Latency", item.topic() + "##" + part.partitionId());
+                LOGGER.debug("Writing to Topic: {}; Partition: {};", item.topic(), part.partitionId());
+                MetricNameEncoded producerPartitionLatency = metricNameFactory.createWithPartition("Producer.Partition.Latency", item.topic() + "##" + part.partitionId());
                 Histogram histogramProducerPartitionLatency = new Histogram(new SlidingWindowReservoir(1));
                 if (!metrics.getNames().contains(new Gson().toJson(producerPartitionLatency))) {
                     if (appProperties.sendProducerPartitionLatency)
@@ -179,7 +183,7 @@ public class ProducerThread implements Callable<Long> {
                     producer.sendCanaryToTopicPartition(item.topic(), Integer.toString(part.partitionId()));
                     endTime = System.currentTimeMillis();
                 } catch (Exception e) {
-                    m_logger.error("Error Writing to Topic: {}; Partition: {}; Exception: {}", item.topic(), part.partitionId(), e);
+                    LOGGER.error("Error Writing to Topic: {}; Partition: {}; Exception: {}", item.topic(), part.partitionId(), e);
                     topicProducerFailCount++;
                     partitionProducerFailCount++;
                     endTime = System.currentTimeMillis() + DEFAULT_ELAPSED_TIME;
@@ -193,27 +197,27 @@ public class ProducerThread implements Callable<Long> {
                 histogramProducerPartitionLatency.update(endTime - startTime);
 
                 if (appProperties.sendProducerPartitionAvailability) {
-                    MetricNameEncoded producerPartitionAvailability = new MetricNameEncoded("Producer.Partition.Availability", item.topic() + "##" + part.partitionId());
+                    MetricNameEncoded producerPartitionAvailability = metricNameFactory.createWithPartition("Producer.Partition.Availability", item.topic() + "##" + part.partitionId());
                     if (!metrics.getNames().contains(new Gson().toJson(producerPartitionAvailability))) {
                         metrics.register(new Gson().toJson(producerPartitionAvailability), new AvailabilityGauge(1, 1 - partitionProducerFailCount));
                     }
                 }
             }
             if (appProperties.sendProducerTopicAvailability) {
-                MetricNameEncoded producerTopicAvailability = new MetricNameEncoded("Producer.Topic.Availability", item.topic());
+                MetricNameEncoded producerTopicAvailability = metricNameFactory.createWithTopic("Producer.Topic.Availability", item.topic());
                 if (!metrics.getNames().contains(new Gson().toJson(producerTopicAvailability))) {
                     metrics.register(new Gson().toJson(producerTopicAvailability), new AvailabilityGauge(item.partitionsMetadata().size(), item.partitionsMetadata().size() - topicProducerFailCount));
                 }
             }
         }
         if (appProperties.sendProducerAvailability) {
-            MetricNameEncoded producerAvailability = new MetricNameEncoded("Producer.Availability", "all");
+            MetricNameEncoded producerAvailability = metricNameFactory.createWithTopic("Producer.Availability", "all");
             if (!metrics.getNames().contains(new Gson().toJson(producerAvailability))) {
                 metrics.register(new Gson().toJson(producerAvailability), new AvailabilityGauge(producerTryCount, producerTryCount - producerFailCount));
             }
         }
         producer.close();
         ((MetaDataManager) metaDataManager).close();
-        m_logger.info("Finished ProducerLatency");
+        LOGGER.info("Finished ProducerLatency");
     }
 }

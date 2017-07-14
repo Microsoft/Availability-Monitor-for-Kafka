@@ -277,7 +277,7 @@ public class SqlReporter extends ScheduledReporter {
         int iMaxRetries = 10;
 
         MetricNameEncoded metricNameEncoded = new Gson().fromJson(name, MetricNameEncoded.class);
-        final long timestamp = metricNameEncoded.timeInSeconds();
+        final long timestamp = System.currentTimeMillis();
         SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
         sdf.setTimeZone(TimeZone.getTimeZone("UTC"));
         try {

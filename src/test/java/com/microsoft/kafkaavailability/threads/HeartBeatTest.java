@@ -1,5 +1,6 @@
 package com.microsoft.kafkaavailability.threads;
 
+import com.microsoft.kafkaavailability.metrics.MetricNameEncodedFactory;
 import com.microsoft.kafkaavailability.properties.AppProperties;
 import com.microsoft.kafkaavailability.reporters.ScheduledReporterCollector;
 import org.junit.Before;
@@ -18,7 +19,6 @@ import static org.mockito.Mockito.verify;
 
 @RunWith(MockitoJUnitRunner.class)
 public class HeartBeatTest {
-    static final private String SERVER_NAME = "SERVER_NAME";
     static final private long DEFAULT_INTERVAL = 30l;
     static final private long DIFFERENT_INTERVAL = 90l;
 
@@ -28,12 +28,14 @@ public class HeartBeatTest {
     private ScheduledExecutorService mockScheduledExecutorService;
     @Mock
     private AppProperties mockAppProperties;
+    @Mock
+    private MetricNameEncodedFactory mockMetricNameEncodedFactory;
 
     private HeartBeat heartBeat;
 
     @Before
     public void setup() {
-        heartBeat = new HeartBeat(mockScheduledReporterCollector, mockAppProperties, SERVER_NAME, mockScheduledExecutorService);
+        heartBeat = new HeartBeat(mockScheduledReporterCollector, mockAppProperties, mockScheduledExecutorService, mockMetricNameEncodedFactory);
     }
 
     @Test
@@ -48,7 +50,7 @@ public class HeartBeatTest {
     public void start_OverrideDefault() {
         Whitebox.setInternalState(mockAppProperties, "heartBeatIntervalInSeconds", DIFFERENT_INTERVAL);
 
-        heartBeat = new HeartBeat(mockScheduledReporterCollector, mockAppProperties, SERVER_NAME, mockScheduledExecutorService);
+        heartBeat = new HeartBeat(mockScheduledReporterCollector, mockAppProperties, mockScheduledExecutorService, mockMetricNameEncodedFactory);
         heartBeat.start();
 
         verify(mockScheduledReporterCollector).start();

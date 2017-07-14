@@ -15,6 +15,7 @@ import com.microsoft.kafkaavailability.*;
 import com.microsoft.kafkaavailability.discovery.CommonUtils;
 import com.microsoft.kafkaavailability.metrics.AvailabilityGauge;
 import com.microsoft.kafkaavailability.metrics.MetricNameEncoded;
+import com.microsoft.kafkaavailability.metrics.MetricNameEncodedFactory;
 import com.microsoft.kafkaavailability.reporters.ScheduledReporterCollector;
 import com.microsoft.kafkaavailability.properties.AppProperties;
 import com.microsoft.kafkaavailability.properties.MetaDataManagerProperties;
@@ -41,17 +42,20 @@ public class AvailabilityThread implements Callable<Long> {
     private final ScheduledReporterCollector reporterCollector;
     private final CuratorFramework m_curatorFramework;
     private final AppProperties appProperties;
+    private final MetricNameEncodedFactory metricNameFactory;
 
     private Phaser m_phaser;
     private long m_threadSleepTime;
 
     @Inject
     public AvailabilityThread(CuratorFramework curatorFramework, ScheduledReporterCollector reporterCollector,
-                              AppProperties appProperties, @Assisted Phaser phaser, @Assisted long threadSleepTime) {
+                              AppProperties appProperties,MetricNameEncodedFactory metricNameFactory,
+                              @Assisted Phaser phaser, @Assisted long threadSleepTime) {
         this.m_curatorFramework = curatorFramework;
         this.reporterCollector = reporterCollector;
         this.reporterCollector.start();
         this.appProperties = appProperties;
+        this.metricNameFactory = metricNameFactory;
 
         this.m_phaser = phaser;
         //this.m_phaser.register(); //Registers/Add a new unArrived party to this phaser.
@@ -156,7 +160,7 @@ public class AvailabilityThread implements Callable<Long> {
                           boolean reportAvailability, boolean reportLatency, boolean useCertificateToConnect,
                           String keyStoreFilePath, String keyStoreFilePassword) {
 
-        int numMessages = 100;
+        int numMessages = 1000;
         long startTime, endTime;
         int failureThreshold = 10;
 
@@ -179,7 +183,7 @@ public class AvailabilityThread implements Callable<Long> {
 
             final SlidingWindowReservoir gtmAvailabilityLatencyWindow = new SlidingWindowReservoir(windowSize);
             Histogram histogramGTMAvailabilityLatency = new Histogram(gtmAvailabilityLatencyWindow);
-            MetricNameEncoded gtmAvailabilityLatency = new MetricNameEncoded(name + ".Availability.Latency", authority);
+            MetricNameEncoded gtmAvailabilityLatency = metricNameFactory.createWithVIP(name + ".Availability.Latency", authority);
             if (!metrics.getNames().contains(new Gson().toJson(gtmAvailabilityLatency))) {
                 if (reportLatency && !gtmList.isEmpty())
                     metrics.register(new Gson().toJson(gtmAvailabilityLatency), histogramGTMAvailabilityLatency);
@@ -213,7 +217,7 @@ public class AvailabilityThread implements Callable<Long> {
             }
             if (reportAvailability && !gtmList.isEmpty()) {
                 m_logger.info("About to report " + name + "Availability-- TryCount:" + gtmIPStatusTryCount + " FailCount:" + gtmIPStatusFailCount);
-                MetricNameEncoded kafkaGTMIPAvailability = new MetricNameEncoded(name + ".Availability", authority);
+                MetricNameEncoded kafkaGTMIPAvailability = metricNameFactory.createWithVIP(name + ".Availability", authority);
                 if (!metrics.getNames().contains(new Gson().toJson(kafkaGTMIPAvailability))) {
                     metrics.register(new Gson().toJson(kafkaGTMIPAvailability), new AvailabilityGauge(gtmIPStatusTryCount, gtmIPStatusTryCount - gtmIPStatusFailCount));
                 }
