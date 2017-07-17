@@ -160,7 +160,7 @@ public class AvailabilityThread implements Callable<Long> {
                           boolean reportAvailability, boolean reportLatency, boolean useCertificateToConnect,
                           String keyStoreFilePath, String keyStoreFilePassword) {
 
-        int numMessages = 1000;
+        int numMessages = 100;
         long startTime, endTime;
         int failureThreshold = 10;
 
