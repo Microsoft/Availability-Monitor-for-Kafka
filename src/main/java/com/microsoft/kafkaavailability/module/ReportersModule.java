@@ -14,11 +14,9 @@ import com.microsoft.kafkaavailability.discovery.CommonUtils;
 import com.microsoft.kafkaavailability.metrics.MetricNameEncodedFactory;
 import com.microsoft.kafkaavailability.properties.AppProperties;
 import com.microsoft.kafkaavailability.properties.ReporterProperties;
-import com.microsoft.kafkaavailability.reporters.SqlReporter;
 import com.microsoft.kafkaavailability.reporters.StatsdClient;
 import com.microsoft.kafkaavailability.reporters.StatsdReporter;
 
-import java.util.Locale;
 import java.util.concurrent.TimeUnit;
 
 public class ReportersModule extends AbstractModule {
@@ -55,23 +53,6 @@ public class ReportersModule extends AbstractModule {
                 .convertDurationsTo(TimeUnit.SECONDS)
                 .build(statsdClient);
     }
-
-
-    @ProvidesIntoMap
-    @StringMapKey("sqlReporter")
-    public ScheduledReporter sqlReporter() {
-
-        String sqlConnection = reporterProperties.sqlConnectionString == null ? "localhost" : reporterProperties.sqlConnectionString;
-
-        String clusterName = appProperties.environmentName == null ? "Unknown" : appProperties.environmentName;
-
-        return SqlReporter.forRegistry(metricRegistry)
-                .formatFor(Locale.US)
-                .convertRatesTo(TimeUnit.SECONDS)
-                .convertDurationsTo(TimeUnit.SECONDS)
-                .build(sqlConnection, clusterName);
-    }
-
 
     @ProvidesIntoMap
     @StringMapKey("consoleReporter")

@@ -169,7 +169,7 @@ public class ConsumerThread implements Callable<Long> {
             consumerTryCount++;
             final SlidingWindowReservoir topicLatency = new SlidingWindowReservoir(item.partitionsMetadata().size());
             Histogram histogramConsumerTopicLatency = new Histogram(topicLatency);
-            MetricNameEncoded consumerTopicLatency = metricNameFactory.createWithTopic("Consumer.Topic.Latency", item.topic());
+            MetricNameEncoded consumerTopicLatency = metricNameFactory.createWithTopic("Consumer.Latency", item.topic());
             if (!metrics.getNames().contains(new Gson().toJson(consumerTopicLatency))) {
                 if (appProperties.sendConsumerTopicLatency)
                     metrics.register(new Gson().toJson(consumerTopicLatency), histogramConsumerTopicLatency);
@@ -218,7 +218,7 @@ public class ConsumerThread implements Callable<Long> {
                         isTopicAvailable = false;
                     }
                 }
-                MetricNameEncoded consumerPartitionLatency = metricNameFactory.createWithPartition("Consumer.Partition.Latency", item.topic() + "##" + key);
+                MetricNameEncoded consumerPartitionLatency = metricNameFactory.createWithPartition("Consumer.Latency", item.topic() + "##" + key);
                 Histogram histogramConsumerPartitionLatency = new Histogram(new SlidingWindowReservoir(1));
                 if (!metrics.getNames().contains(new Gson().toJson(consumerPartitionLatency))) {
                     if (appProperties.sendConsumerPartitionLatency)
@@ -228,14 +228,14 @@ public class ConsumerThread implements Callable<Long> {
                 histogramConsumerTopicLatency.update(elapsedTime);
                 histogramConsumerLatency.update(elapsedTime);
                 if (appProperties.sendConsumerPartitionAvailability) {
-                    MetricNameEncoded consumerPartitionAvailability = metricNameFactory.createWithPartition("Consumer.Partition.Availability", item.topic() + "##" + key);
+                    MetricNameEncoded consumerPartitionAvailability = metricNameFactory.createWithPartition("Consumer.Availability", item.topic() + "##" + key);
                     if (!metrics.getNames().contains(new Gson().toJson(consumerPartitionAvailability))) {
                         metrics.register(new Gson().toJson(consumerPartitionAvailability), new AvailabilityGauge(1, 1 - partitionConsumerFailCount));
                     }
                 }
             }
             if (appProperties.sendConsumerTopicAvailability) {
-                MetricNameEncoded consumerTopicAvailability = metricNameFactory.createWithTopic("Consumer.Topic.Availability", item.topic());
+                MetricNameEncoded consumerTopicAvailability = metricNameFactory.createWithTopic("Consumer.Availability", item.topic());
                 if (!metrics.getNames().contains(new Gson().toJson(consumerTopicAvailability))) {
                     metrics.register(new Gson().toJson(consumerTopicAvailability), new AvailabilityGauge(response.keySet().size(), response.keySet().size() - topicConsumerFailCount));
                 }

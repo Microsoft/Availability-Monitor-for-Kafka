@@ -162,7 +162,7 @@ public class ProducerThread implements Callable<Long> {
             producerTryCount++;
             final SlidingWindowReservoir topicLatency = new SlidingWindowReservoir(item.partitionsMetadata().size());
             Histogram histogramProducerTopicLatency = new Histogram(topicLatency);
-            MetricNameEncoded producerTopicLatency = metricNameFactory.createWithTopic("Producer.Topic.Latency", item.topic());
+            MetricNameEncoded producerTopicLatency = metricNameFactory.createWithTopic("Producer.Latency", item.topic());
             if (!metrics.getNames().contains(new Gson().toJson(producerTopicLatency))) {
                 if (appProperties.sendProducerTopicLatency)
                     metrics.register(new Gson().toJson(producerTopicLatency), histogramProducerTopicLatency);
@@ -171,7 +171,7 @@ public class ProducerThread implements Callable<Long> {
             for (kafka.javaapi.PartitionMetadata part : item.partitionsMetadata()) {
                 int partitionProducerFailCount = 0;
                 LOGGER.debug("Writing to Topic: {}; Partition: {};", item.topic(), part.partitionId());
-                MetricNameEncoded producerPartitionLatency = metricNameFactory.createWithPartition("Producer.Partition.Latency", item.topic() + "##" + part.partitionId());
+                MetricNameEncoded producerPartitionLatency = metricNameFactory.createWithPartition("Producer.Latency", item.topic() + "##" + part.partitionId());
                 Histogram histogramProducerPartitionLatency = new Histogram(new SlidingWindowReservoir(1));
                 if (!metrics.getNames().contains(new Gson().toJson(producerPartitionLatency))) {
                     if (appProperties.sendProducerPartitionLatency)
@@ -197,14 +197,14 @@ public class ProducerThread implements Callable<Long> {
                 histogramProducerPartitionLatency.update(endTime - startTime);
 
                 if (appProperties.sendProducerPartitionAvailability) {
-                    MetricNameEncoded producerPartitionAvailability = metricNameFactory.createWithPartition("Producer.Partition.Availability", item.topic() + "##" + part.partitionId());
+                    MetricNameEncoded producerPartitionAvailability = metricNameFactory.createWithPartition("Producer.Availability", item.topic() + "##" + part.partitionId());
                     if (!metrics.getNames().contains(new Gson().toJson(producerPartitionAvailability))) {
                         metrics.register(new Gson().toJson(producerPartitionAvailability), new AvailabilityGauge(1, 1 - partitionProducerFailCount));
                     }
                 }
             }
             if (appProperties.sendProducerTopicAvailability) {
-                MetricNameEncoded producerTopicAvailability = metricNameFactory.createWithTopic("Producer.Topic.Availability", item.topic());
+                MetricNameEncoded producerTopicAvailability = metricNameFactory.createWithTopic("Producer.Availability", item.topic());
                 if (!metrics.getNames().contains(new Gson().toJson(producerTopicAvailability))) {
                     metrics.register(new Gson().toJson(producerTopicAvailability), new AvailabilityGauge(item.partitionsMetadata().size(), item.partitionsMetadata().size() - topicProducerFailCount));
                 }

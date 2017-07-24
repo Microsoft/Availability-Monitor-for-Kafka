@@ -1,6 +1,5 @@
 {
   "reportersCommaSeparatedList": "consoleReporter",
-  "sqlConnectionString": "jdbc:sqlserver://test;DatabaseName=test;lockTimeout=30000;loginTimeout=30000;user=test;password=test",
   "statsdEndpoint": "localhost",
   "statsdPort": 8125,
   "metricsNamespace": "KAT"

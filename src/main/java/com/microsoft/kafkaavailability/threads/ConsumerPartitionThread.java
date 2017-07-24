@@ -51,6 +51,9 @@ public class ConsumerPartitionThread implements Callable<Long> {
         try {
             consumer.ConsumeFromTopicPartition(m_TopicMetadata.topic(), m_PartitionMetadata.partitionId());
             endTime = System.currentTimeMillis();
+        } catch (InterruptedException e) {
+            m_logger.warn("Thread interrupted for Topic: {}; Partition: {};", m_TopicMetadata.topic(), m_PartitionMetadata.partitionId());
+            endTime = System.currentTimeMillis();
         } catch (Exception e) {
             m_logger.error("Error Reading from Topic: {}; Partition: {}; Exception: {}", m_TopicMetadata.topic(), m_PartitionMetadata.partitionId(), e);
             endTime = System.currentTimeMillis() + DEFAULT_ELAPSED_TIME;
