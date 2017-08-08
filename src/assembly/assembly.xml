@@ -6,8 +6,20 @@
     <formats>
         <format>tar.gz</format>
     </formats>
+
+
     <includeBaseDirectory>false</includeBaseDirectory>
     <baseDirectory>.</baseDirectory>
+
+    <files>
+        <file>
+            <source>
+                target/${project.artifactId}-${project.version}-jar-with-dependencies.jar
+            </source>
+            <outputDirectory>/</outputDirectory>
+        </file>
+    </files>
+
     <fileSets>
         <fileSet>
             <includes>
@@ -29,6 +41,14 @@
             <outputDirectory>.</outputDirectory>
             <includes>
                 <include>kafkaavailability-1.0-SNAPSHOT-*.jar</include>
+            </includes>
+        </fileSet>
+
+        <fileSet >
+            <directory>Scripts/</directory>
+            <outputDirectory>.</outputDirectory>
+            <includes>
+                <include>runkat.sh</include>
             </includes>
         </fileSet>
     </fileSets>

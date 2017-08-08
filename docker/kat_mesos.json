@@ -1,0 +1,30 @@
+{
+  "id": "kat",
+  "instances": 1 ,
+  "cpus": 7,
+  "mem": 6144,
+  "container": {
+    "type": "DOCKER",
+    "docker": {
+      "image": "image",
+      "network": "BRIDGE",
+      "portMappings": [ { "containerPort": 85, "hostPort": 443 } ,
+        { "containerPort": 22, "hostPort": 2223 } ,
+        { "containerPort": 18189, "hostPort": 18189 } ],
+      "parameters":[ { "key": "env", "value" :"ENVIRONMENTNAME=name" },
+        { "key": "env", "value" :"ZOOKEEPERHOSTS=zkList" },
+        { "key": "env", "value" :"STATSDENDPOINT=endpoint"} ,
+        { "key": "env", "value" :"KAFKAGTMIP=gtmendpoint"} ,
+        { "key": "env", "value" :"KAFKAIP=kafkaip"} ,
+        { "key": "env", "value" :"KAT_PORT=port"},
+        { "key": "env", "value" :"CANARYTESTTOPICS=test1" },
+        { "key": "env", "value" :"REPORTERSCOMMASEPARATEDLIST=consoleReporter,mdmStatsdReporter"} ]
+    }
+  },
+  "acceptedResourceRoles": [
+    "slave_public"
+  ],
+  "uris": [
+    "file:///home/sshadmin/docker.tar.gz"
+  ]
+}

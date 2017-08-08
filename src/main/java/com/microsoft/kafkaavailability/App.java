@@ -134,6 +134,7 @@ public class App {
 
             curatorManager.verifyRegistrations();
         } catch (Exception e) {
+
                 /*                 * Something bad did happen, but carry on
                  */
             m_logger.error(e.getMessage(), e);

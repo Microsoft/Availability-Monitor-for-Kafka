@@ -3,9 +3,7 @@
     "broker1:port",
     "broker2:port"
   ],
-  "whiteListTopics":[
-    "testtopic"
-  ],
+  "whiteListTopics":[],
   "blackListTopics":[
     "__consumer_offsets"
   ],
