@@ -68,9 +68,10 @@ public class PropertiesManager<T> implements IPropertiesManager<T>
     }
 
     private void MergePropsFromEnv(Object prop){
+        m_logger.debug("Overriding from en variables");
         Field[] propFields = prop.getClass().getFields();
         for(Field field : propFields){
-            String envVarName = field.getName().replaceAll(".", "_").toUpperCase();
+            String envVarName = field.getName().toUpperCase();
             String override= System.getenv(envVarName);
             if(override != null){
                 setProperty(field.getName(), override);
@@ -82,7 +83,7 @@ public class PropertiesManager<T> implements IPropertiesManager<T>
         try {
             Field field = m_prop.getClass().getDeclaredField(propName);
             String dataType = field.getType().getCanonicalName();
-            m_logger.info("Setting " + propName + " from envirnment variable as " + override);
+            m_logger.debug("Setting " + propName + " from envirnment variable as " + override);
             if(dataType == LIST_TYPE){
                 List<String> value = new ArrayList<String>(Arrays.asList(override.split(",")));
                 set(field,value);
