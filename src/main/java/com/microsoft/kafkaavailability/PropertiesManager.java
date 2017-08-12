@@ -51,7 +51,7 @@ public class PropertiesManager<T> implements IPropertiesManager<T>
         {
             String text = Resources.toString(url, Charsets.UTF_8);
             m_prop = gson.fromJson(text, m_typeParameterClass);
-            MergePropsFromEnv(m_prop);
+            this.MergePropsFromEnv(m_prop);
         } else
         {
             throw new FileNotFoundException("property file '" + propFileName + "' not found in the classpath");
@@ -68,7 +68,7 @@ public class PropertiesManager<T> implements IPropertiesManager<T>
     }
 
     private void MergePropsFromEnv(Object prop){
-        m_logger.debug("Overriding from en variables");
+        m_logger.info("Inside merge from prop");
         Field[] propFields = prop.getClass().getFields();
         for(Field field : propFields){
             String envVarName = field.getName().toUpperCase();
@@ -83,15 +83,23 @@ public class PropertiesManager<T> implements IPropertiesManager<T>
         try {
             Field field = m_prop.getClass().getDeclaredField(propName);
             String dataType = field.getType().getCanonicalName();
-            m_logger.debug("Setting " + propName + " from envirnment variable as " + override);
-            if(dataType == LIST_TYPE){
-                List<String> value = new ArrayList<String>(Arrays.asList(override.split(",")));
-                set(field,value);
+            switch (dataType){
+                case LIST_TYPE:
+                    List<String> value = new ArrayList<String>(Arrays.asList(override.split(",")));
+                    set(field,value);
+                    break;
+                case INT_TYPE:
+                    int intData = Integer.parseInt(override);
+                    set(field,intData);
+                    break;
+                case STRING_TYPE:
+                    set(field,override);
+                    break;
+                default:
+                    m_logger.error("Not Supported");
+
             }
-            if(dataType == INT_TYPE){
-                int value = Integer.parseInt(override);
-                set(field,value);
-            }
+
         }catch(NoSuchFieldException Ex){
             m_logger.error("Field cannot be found in the config "+ Ex.getMessage() );
         }
@@ -99,6 +107,7 @@ public class PropertiesManager<T> implements IPropertiesManager<T>
 
     private void set(Field field,Object value){
         try{
+            m_logger.debug("Setting env : " + field.getName() + " as " + value );
             field.set(m_prop,value);
         }catch(IllegalAccessException Ex){
             m_logger.error("Error while setting property "+ field.getName() + Ex.getMessage());
