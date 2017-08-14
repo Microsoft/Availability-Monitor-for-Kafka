@@ -112,7 +112,6 @@ public class PropertiesManager<T> implements IPropertiesManager<T>
                     break;
                 default:
                     m_logger.error("Not Supported");
-
             }
 
         }catch(NoSuchFieldException Ex){
