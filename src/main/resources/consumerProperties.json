@@ -1,6 +1,6 @@
 {
   "maxReads": 2,
-  "port": 9092,
+  "brokerPort": 9092,
   "fetchSize": 1000000,
   "bufferSize": 65536,
   "soTimeout": 100000

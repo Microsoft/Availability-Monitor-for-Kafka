@@ -73,7 +73,7 @@ public class Consumer implements IConsumer {
     public void ConsumeFromTopicPartition(String a_topic, int a_partition) throws Exception {
         // find the meta data about the topic and partition we are interested in
 
-        PartitionMetadata metadata = findLeader(m_metaDataManager.getBrokerList(false), m_consumerProperties.port, a_topic, a_partition);
+        PartitionMetadata metadata = findLeader(m_metaDataManager.getBrokerList(false), m_consumerProperties.brokerPort, a_topic, a_partition);
         if (metadata == null) {
             throw new Exception("Cannot find metadata for Topic and Partition. Exiting");
         }
@@ -85,21 +85,21 @@ public class Consumer implements IConsumer {
 
         SimpleConsumer consumer = null;
         try {
-            consumer = new kafka.javaapi.consumer.SimpleConsumer(leadBroker, m_consumerProperties.port, m_consumerProperties.soTimeout, m_consumerProperties.bufferSize, clientName);
+            consumer = new kafka.javaapi.consumer.SimpleConsumer(leadBroker, m_consumerProperties.brokerPort, m_consumerProperties.soTimeout, m_consumerProperties.bufferSize, clientName);
             long readOffset = getLastOffset(consumer, a_topic, a_partition, kafka.api.OffsetRequest.EarliestTime(), clientName);
 
             int numErrors = 0;
             int maxReads = m_consumerProperties.maxReads;
             while (maxReads > 0) {
                 if (consumer == null) {
-                    consumer = new kafka.javaapi.consumer.SimpleConsumer(leadBroker, m_consumerProperties.port, m_consumerProperties.soTimeout, m_consumerProperties.bufferSize, clientName);
+                    consumer = new kafka.javaapi.consumer.SimpleConsumer(leadBroker, m_consumerProperties.brokerPort, m_consumerProperties.soTimeout, m_consumerProperties.bufferSize, clientName);
                 }
                 FetchRequest req = new FetchRequestBuilder()
                         .clientId(clientName)
                         .addFetch(a_topic, a_partition, readOffset, m_consumerProperties.fetchSize) // Note: this fetchSize of 100000 might need to be increased if large batches are written to Kafka
                         .build();
                 logger.debug("Reading " + m_consumerProperties.fetchSize
-                        + " from Kafka broker " + leadBroker + ":" + m_consumerProperties.port
+                        + " from Kafka broker " + leadBroker + ":" + m_consumerProperties.brokerPort
                         + " with offset " + readOffset);
 
                 FetchResponse fetchResponse = consumer.fetch(req);
@@ -130,7 +130,7 @@ public class Consumer implements IConsumer {
                     consumer = null;
                     try {
                         logger.debug("Consumer encountered an error with latest fetch. Attempting to find new leader");
-                        leadBroker = findNewLeader(leadBroker, a_topic, a_partition, m_consumerProperties.port);
+                        leadBroker = findNewLeader(leadBroker, a_topic, a_partition, m_consumerProperties.brokerPort);
                     } catch (Exception e) {
                         logger.error("Kafka consumer aborting read due to exception thrown finding leader");
                         break;
