@@ -33,6 +33,9 @@ public class PropertiesManager<T> implements IPropertiesManager<T>
     private static final String STRING_TYPE = "java.lang.String";
     private static final String LIST_TYPE = "java.util.List";
     private static final String INT_TYPE = "int";
+    private static final String LONG_TYPE = "long";
+    private static final String DOUBLE_TYPE = "double";
+    private static final String BOOLEAN_TYPE = "boolean";
 
     /***
      *
@@ -51,7 +54,7 @@ public class PropertiesManager<T> implements IPropertiesManager<T>
         {
             String text = Resources.toString(url, Charsets.UTF_8);
             m_prop = gson.fromJson(text, m_typeParameterClass);
-            this.MergePropsFromEnv(m_prop);
+            this.mergePropsFromEnv(m_prop);
         } else
         {
             throw new FileNotFoundException("property file '" + propFileName + "' not found in the classpath");
@@ -67,7 +70,7 @@ public class PropertiesManager<T> implements IPropertiesManager<T>
         return m_prop;
     }
 
-    private void MergePropsFromEnv(Object prop){
+    private void mergePropsFromEnv(Object prop){
         m_logger.info("Inside merge from prop");
         Field[] propFields = prop.getClass().getFields();
         for(Field field : propFields){
@@ -94,6 +97,18 @@ public class PropertiesManager<T> implements IPropertiesManager<T>
                     break;
                 case STRING_TYPE:
                     set(field,override);
+                    break;
+                case LONG_TYPE:
+                    long longData = Long.parseLong(override);
+                    set(field,longData);
+                    break;
+                case DOUBLE_TYPE:
+                    double doubleData = Double.parseDouble(override);
+                    set(field,doubleData);
+                    break;
+                case BOOLEAN_TYPE:
+                    boolean booleanData = Boolean.parseBoolean(override);
+                    set(field,booleanData);
                     break;
                 default:
                     m_logger.error("Not Supported");
