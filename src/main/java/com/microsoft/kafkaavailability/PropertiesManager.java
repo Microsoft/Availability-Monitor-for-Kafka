@@ -88,7 +88,7 @@ public class PropertiesManager<T> implements IPropertiesManager<T>
             String dataType = field.getType().getCanonicalName();
             switch (dataType){
                 case LIST_TYPE:
-                    List<String> value = new ArrayList<String>(Arrays.asList(override.split(",")));
+                    List<String> value = Arrays.asList(override.split(","));
                     set(field,value);
                     break;
                 case INT_TYPE:
