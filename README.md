@@ -18,7 +18,7 @@ The tool measures Consumer availability and latency by reading data from the tai
 	```
 		"zooKeeperHosts": "1.1.1.1:2181,2.2.2.2:2181",
 	```
-Also modify the following files to set up SQL/CSV/SLF4J/JMX reporting. The frequency of sending canary messages, reading tail data and the frequency of reporting are all controlled by the commandline argument "sleep" in milliseconds. The default value is 3000 milliseconds (ie. 5 mins).
+Also modify the following files to set up SQL/CSV/SLF4J/JMX reporting. The frequency of sending canary messages, reading tail data and the frequency of reporting are all controlled by the commandline argument "sleep" in milliseconds. The default value is 300000 milliseconds (ie. 5 mins).
 	```
 		KafkaAvailability / src / main / resources / log4j.properties
 		KafkaAvailability / src / main / resources / appProperties.json
