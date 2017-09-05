@@ -42,7 +42,6 @@ public class HeartBeatTest {
     public void start() {
         heartBeat.start();
 
-        verify(mockScheduledReporterCollector).start();
         verify(mockScheduledExecutorService).scheduleAtFixedRate(any(HeartBeatThread.class), eq(0l), eq(DEFAULT_INTERVAL), eq(TimeUnit.SECONDS));
     }
 
@@ -53,14 +52,12 @@ public class HeartBeatTest {
         heartBeat = new HeartBeat(mockScheduledReporterCollector, mockAppProperties, mockScheduledExecutorService, mockMetricNameEncodedFactory);
         heartBeat.start();
 
-        verify(mockScheduledReporterCollector).start();
         verify(mockScheduledExecutorService).scheduleAtFixedRate(any(HeartBeatThread.class), eq(0l), eq(DIFFERENT_INTERVAL), eq(TimeUnit.SECONDS));
     }
 
     @Test
     public void stop() {
         heartBeat.stop();
-        verify(mockScheduledReporterCollector).stop();
         verify(mockScheduledExecutorService).shutdownNow();
     }
 

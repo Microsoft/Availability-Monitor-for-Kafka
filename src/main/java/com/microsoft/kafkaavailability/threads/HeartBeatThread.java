@@ -35,7 +35,6 @@ public class HeartBeatThread implements Runnable {
             if (!metrics.getNames().contains(new Gson().toJson(heartbeatAvailability))) {
                 metrics.register(new Gson().toJson(heartbeatAvailability), new AvailabilityGauge(1, 1));
             }
-            reporterCollector.report();
         } catch (Exception e) {
             logger.error(e.getMessage(), e);
         }

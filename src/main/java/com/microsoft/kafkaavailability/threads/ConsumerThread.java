@@ -51,7 +51,6 @@ public class ConsumerThread implements Callable<Long> {
                           @Assisted  Phaser phaser, @Assisted List<String> listServers, @Assisted long threadSleepTime) {
         this.m_curatorFramework = curatorFramework;
         this.reporterCollector = reporterCollector;
-        this.reporterCollector.start();
         this.serviceSpecProvider = serviceSpecProvider;
         this.metricNameFactory = metricNameFactory;
 
@@ -83,7 +82,6 @@ public class ConsumerThread implements Callable<Long> {
             }
         } finally {
             try {
-                reporterCollector.report();
                 CommonUtils.sleep(1000);
             } catch (Exception e) {
                 m_logger.error(e.getMessage(), e);
@@ -97,7 +95,6 @@ public class ConsumerThread implements Callable<Long> {
         } catch (IllegalStateException exception) {
         }
 
-        reporterCollector.stop();
         CommonUtils.dumpPhaserState("After arrival of ConsumerThread", m_phaser);
         m_logger.info("ConsumerThread (run()) has been COMPLETED.");
         return Long.valueOf(elapsedTime);

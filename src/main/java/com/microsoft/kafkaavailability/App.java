@@ -19,6 +19,7 @@ import com.microsoft.kafkaavailability.module.ReportersModule;
 import com.microsoft.kafkaavailability.module.MonitorTasksModule;
 import com.microsoft.kafkaavailability.properties.AppProperties;
 import com.microsoft.kafkaavailability.properties.MetaDataManagerProperties;
+import com.microsoft.kafkaavailability.reporters.ScheduledReporterCollector;
 import com.microsoft.kafkaavailability.threads.HeartBeat;
 import com.microsoft.kafkaavailability.threads.JobManager;
 import com.microsoft.kafkaavailability.threads.MonitorTaskFactory;
@@ -51,7 +52,6 @@ public class App {
     public static void main(String[] args) throws IOException, MetaDataManagerException, InterruptedException {
         m_logger.info("Starting KafkaAvailability Tool");
 
-
         Options options = new Options();
         options.addOption("r", "run", true, "Number of runs. Don't use this argument if you want to run infinitely.");
         options.addOption("s", "sleep", true, "Time (in milliseconds) to sleep between each run. Default is 30000");
@@ -60,71 +60,74 @@ public class App {
 
         CommandLineParser parser = new DefaultParser();
         HelpFormatter formatter = new HelpFormatter();
-        HeartBeat heartBeat = null;
 
+        CommandLine line;
         try {
             // parse the command line arguments
-            CommandLine line = parser.parse(options, args);
-            int howManyRuns;
-
-            //Parent injector to process command line arguments and json files
-            Injector parent = Guice.createInjector(new AppModule(line, "reporterProperties.json", "appProperties.json", "metadatamanagerProperties.json"));
-
-            ImmutableSet<Module> allGuiceModules = ImmutableSet.<Module>builder()
-                    .add(MultibindingsScanner.asModule())
-                    .add(parent.getInstance(ReportersModule.class))
-                    .add(parent.getInstance(MonitorTasksModule.class))
-                    .addAll(ModuleScanner.getModulesFromDependencies())
-                    .build();
-
-            Injector injector = parent.createChildInjector(allGuiceModules.toArray(new Module[allGuiceModules.size()]));
-
-            appProperties = injector.getInstance(AppProperties.class);
-            metaDataProperties = injector.getInstance(MetaDataManagerProperties.class);
-
-            final CuratorManager curatorManager = injector.getInstance(CuratorManager.class);
-            final MonitorTaskFactory monitorTaskFactory = injector.getInstance(MonitorTaskFactory.class);
-            heartBeat = injector.getInstance(HeartBeat.class);
-
-            MDC.put("cluster", appProperties.environmentName);
-            MDC.put("computerName", computerName);
-
-            if (line.hasOption("sleep")) {
-                m_sleepTime = Integer.parseInt(line.getOptionValue("sleep"));
-            }
-
-            heartBeat.start();
-            if (line.hasOption("run")) {
-                howManyRuns = Integer.parseInt(line.getOptionValue("run"));
-                for (int i = 0; i < howManyRuns; i++) {
-                    waitForChanges(curatorManager);
-                    runOnce(monitorTaskFactory);
-                    Thread.sleep(m_sleepTime);
-                }
-            } else {
-                while (true) {
-                    waitForChanges(curatorManager);
-                    runOnce(monitorTaskFactory);
-                    Thread.sleep(m_sleepTime);
-                }
-            }
+            line = parser.parse(options, args);
         } catch (ParseException exp) {
             // oops, something went wrong
             m_logger.error("Parsing failed.  Reason: " + exp.getMessage());
             formatter.printHelp("KafkaAvailability", options);
-        } catch (Exception e) {
-            m_logger.error(e.getMessage(), e);
-        } finally {
-            if (heartBeat != null) {
-               heartBeat.stop();
+            throw new RuntimeException("Failed to parse app variables");
+        }
+
+        Injector parent = Guice.createInjector(new AppModule(line, "reporterProperties.json", "appProperties.json", "metadatamanagerProperties.json"));
+
+        ImmutableSet<Module> allGuiceModules = ImmutableSet.<Module>builder()
+                .add(MultibindingsScanner.asModule())
+                .add(parent.getInstance(ReportersModule.class))
+                .add(parent.getInstance(MonitorTasksModule.class))
+                .addAll(ModuleScanner.getModulesFromDependencies())
+                .build();
+
+        //Parent injector to process command line arguments and json files
+
+        Injector injector = parent.createChildInjector(allGuiceModules.toArray(new Module[allGuiceModules.size()]));
+
+        appProperties = injector.getInstance(AppProperties.class);
+        metaDataProperties = injector.getInstance(MetaDataManagerProperties.class);
+
+        final CuratorManager curatorManager = injector.getInstance(CuratorManager.class);
+        final MonitorTaskFactory monitorTaskFactory = injector.getInstance(MonitorTaskFactory.class);
+        final ScheduledReporterCollector reporterCollector = injector.getInstance(ScheduledReporterCollector.class);
+        reporterCollector.start();
+        final HeartBeat heartBeat = injector.getInstance(HeartBeat.class);
+
+        MDC.put("cluster", appProperties.environmentName);
+        MDC.put("computerName", computerName);
+
+        if (line.hasOption("sleep")) {
+            m_sleepTime = Integer.parseInt(line.getOptionValue("sleep"));
+        }
+
+        heartBeat.start();
+        int howManyRuns;
+
+        if (line.hasOption("run")) {
+            howManyRuns = Integer.parseInt(line.getOptionValue("run"));
+            for (int i = 0; i < howManyRuns; i++) {
+                waitForChanges(curatorManager);
+                runOnce(monitorTaskFactory, reporterCollector);
+                Thread.sleep(m_sleepTime);
+            }
+        } else {
+            while (true) {
+                waitForChanges(curatorManager);
+                runOnce(monitorTaskFactory, reporterCollector);
+                Thread.sleep(m_sleepTime);
             }
         }
 
         //used to run shutdown hooks before the program quits. The shutdown hooks (if properly set up) take care of doing all necessary shutdown ceremonies such as closing files, releasing resources etc.
         System.exit(0);
+        if (heartBeat != null) {
+            heartBeat.stop();
+        }
+        reporterCollector.stop();
     }
 
-    private static void waitForChanges(CuratorManager curatorManager) throws Exception {
+    private static void waitForChanges(CuratorManager curatorManager) {
 
         try {
             //wait for rest clients to warm up.
@@ -140,7 +143,7 @@ public class App {
         }
     }
 
-    private static void runOnce(MonitorTaskFactory monitorTaskFactory) throws IOException, MetaDataManagerException {
+    private static void runOnce(MonitorTaskFactory monitorTaskFactory, ScheduledReporterCollector reporterCollector) throws IOException, MetaDataManagerException {
 
         /** The phaser is a nice synchronization barrier. */
         final Phaser phaser = new Phaser(1) {
@@ -266,6 +269,7 @@ public class App {
         phaser.arriveAndDeregister();
         //CommonUtils.dumpPhaserState("After main thread arrived and deregistered", phaser);
 
+        reporterCollector.stop();
         m_logger.info("All Finished.");
     }
 }

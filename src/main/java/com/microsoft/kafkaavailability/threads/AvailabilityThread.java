@@ -53,7 +53,6 @@ public class AvailabilityThread implements Callable<Long> {
                               @Assisted Phaser phaser, @Assisted long threadSleepTime) {
         this.m_curatorFramework = curatorFramework;
         this.reporterCollector = reporterCollector;
-        this.reporterCollector.start();
         this.appProperties = appProperties;
         this.metricNameFactory = metricNameFactory;
 
@@ -82,7 +81,6 @@ public class AvailabilityThread implements Callable<Long> {
                 m_logger.error(e.getMessage(), e);
             } finally {
                 try {
-                    reporterCollector.report();
                     CommonUtils.sleep(1000);
                 } catch (Exception e) {
                     m_logger.error(e.getMessage(), e);
@@ -102,7 +100,6 @@ public class AvailabilityThread implements Callable<Long> {
             }
         } while (!m_phaser.isTerminated());
 
-        reporterCollector.stop();
         m_logger.info("AvailabilityThread (run()) has been COMPLETED.");
         return Long.valueOf(elapsedTime);
     }
