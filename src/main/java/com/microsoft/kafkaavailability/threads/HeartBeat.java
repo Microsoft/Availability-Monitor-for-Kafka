@@ -47,7 +47,6 @@ public class HeartBeat {
     public void start() {
         LOGGER.info(String.format("Starting heartbeat for %s to run every %d seconds with a zero-second delay time", serverName, heartBeatIntervalInSeconds));
 
-        scheduledReporterCollector.start();
         scheduler.scheduleAtFixedRate(new HeartBeatThread(scheduledReporterCollector, metricNameFactory), 0L, heartBeatIntervalInSeconds, TimeUnit.SECONDS);
     }
 
@@ -57,7 +56,5 @@ public class HeartBeat {
         if (scheduler != null) {
             scheduler.shutdownNow();
         }
-
-        scheduledReporterCollector.stop();
     }
 }
