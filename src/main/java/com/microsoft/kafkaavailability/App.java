@@ -124,6 +124,8 @@ public class App {
         if (heartBeat != null) {
             heartBeat.stop();
         }
+
+        reporterCollector.report();
         reporterCollector.stop();
     }
 
