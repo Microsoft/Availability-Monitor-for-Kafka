@@ -119,14 +119,15 @@ public class App {
             }
         }
 
+        reporterCollector.report();
+        reporterCollector.stop();
+
         //used to run shutdown hooks before the program quits. The shutdown hooks (if properly set up) take care of doing all necessary shutdown ceremonies such as closing files, releasing resources etc.
         System.exit(0);
         if (heartBeat != null) {
             heartBeat.stop();
         }
 
-        reporterCollector.report();
-        reporterCollector.stop();
     }
 
     private static void waitForChanges(CuratorManager curatorManager) {
@@ -271,7 +272,6 @@ public class App {
         phaser.arriveAndDeregister();
         //CommonUtils.dumpPhaserState("After main thread arrived and deregistered", phaser);
 
-        reporterCollector.stop();
         m_logger.info("All Finished.");
     }
 }
