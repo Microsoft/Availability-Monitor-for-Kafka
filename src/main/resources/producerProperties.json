@@ -1,6 +1,5 @@
 {
   "serializer_class": "kafka.serializer.StringEncoder",
-  //"partitioner_class": "example.producer.SimplePartitioner",
   "messageStart": "CanaryMessage_",
   "request_required_acks":1
 }

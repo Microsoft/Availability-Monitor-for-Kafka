@@ -18,10 +18,11 @@ The tool measures Consumer availability and latency by reading data from the tai
 	```
 		"zooKeeperHosts": "1.1.1.1:2181,2.2.2.2:2181",
 	```
-Also modify the following files to set up SQL/CSV/SLF4J/JMX reporting. The frequency of sending canary messages, reading tail data and the frequency of reporting are all controlled by the commandline argument "sleep" in milliseconds. The default value is 3000 milliseconds (ie. 5 mins).
+Also modify the following files to set up SQL/CSV/SLF4J/JMX reporting. The frequency of sending canary messages, reading tail data and the frequency of reporting are all controlled by the commandline argument "sleep" in milliseconds. The default value is 300000 milliseconds (ie. 5 mins).
 	```
 		KafkaAvailability / src / main / resources / log4j.properties
 		KafkaAvailability / src / main / resources / appProperties.json
+		KafkaAvailability / src / main / resources / reporterProperties.json
 	```
 
 3. If using precompiled jar, inject the modified resource file(s) into the jar
@@ -89,6 +90,66 @@ CREATE TABLE [dbo].[Errors](
 	[MESSAGE] [varchar](max) NOT NULL
 )
 ```
+6. Google Guice is used to dynamically manage reporters that can be used. At runtime, Guice will find all methods that have @ProvidesIntoMap annotation and return ScheduledReporter object.
+
+Each reporter is named with @StringMapKey annotation, all these reporters will be injected into a map, key being reporter name and value being ScheduledReporter objects.
+
+```
+    @ProvidesIntoMap
+    @StringMapKey("consoleReporter")
+    public ScheduledReporter consoleReporter() {
+
+        return ConsoleReporter
+                .forRegistry(metricRegistry)
+                .convertRatesTo(TimeUnit.SECONDS)
+                .convertDurationsTo(TimeUnit.SECONDS)
+                .build();
+    }
+```
+
+To make use of the injected map, annotate a constructor with @Inject annotation and put Map<String, ScheduledReporter> as a variable. 
+
+Reporters actually being used is configured by "reportersCommaSeparatedList" field of reporterProperties.json file.
+```
+    @Inject
+    public ScheduledReporterCollector(AppProperties appProperties, ReporterProperties reporterProperties,
+                                      MetricRegistry metricRegistry,
+                                      Map<String, ScheduledReporter> allReporters) throws Exception {
+        ...
+    }
+```
+
+This package is also designed to support plugin pattern of reporters, meaning reporters can be put into separate Java packages, reflection is used to find all Guice Module classes and scan them.
+
+The benefit of doing so is to allow changing details of reporters without changing the main package.
+
+To make use of this feature, define new module class in reporter package and annotate reporter provider methods with @ProvidesIntoMap and @StringMapKey as example above.
+
+Runtime variables can be passed to reporter package through Guice, see below as an example.
+
+```
+       @Override
+       protected void configure() {
+           bind(String.class).annotatedWith(Names.named(ENVIRONMENT_NAME_CONSTANT_NAME)).toInstance(appProperties.environmentName);
+           bind(String.class).annotatedWith(Names.named(STATSD_ENDPOINT_CONSTANT_NAME)).toInstance(reporterProperties.statsdEndpoint);
+           bind(Integer.class).annotatedWith(Names.named(STATSD_PORT_CONSTANT_NAME)).toInstance(reporterProperties.statsdPort);
+           bind(String.class).annotatedWith(Names.named(METRICS_NAMESPACE_CONSTANT_NAME)).toInstance(reporterProperties.metricsNamespace);
+       }
+```
+
+Access these variables in reporter package through injection.
+
+```
+@ProvidesIntoMap
+    @StringMapKey("mdmStatsdReporter")
+    public ScheduledReporter mdmStatsdReporter(MetricRegistry metricRegistry, Statsd statsd,
+                                               @Named("environmentName") String environmentName,
+                                               @Named("metricsNamespace") String namespace) {
+
+        return ReporterFactory.createMDMStatsdReporterWithStatd(metricRegistry, statsd, environmentName, namespace);
+    }
+```
+
 ## Community
 * The Availability-Monitor-for-Kafka project welcomes contributions. To contribute, follow the instructions in [CONTRIBUTING.md](CONTRIBUTING.md)
 

@@ -8,10 +8,16 @@ package com.microsoft.kafkaavailability;
 import com.google.common.base.Charsets;
 import com.google.common.io.Resources;
 import com.google.gson.Gson;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.lang.reflect.Field;
 import java.net.URL;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
 
 /***
  * Gets property values from json files.
@@ -22,6 +28,14 @@ public class PropertiesManager<T> implements IPropertiesManager<T>
     private String m_propFileName;
     private T m_prop;
     final Class<T> m_typeParameterClass;
+    final static Logger m_logger = LoggerFactory.getLogger(PropertiesManager.class);
+
+    private static final String STRING_TYPE = "java.lang.String";
+    private static final String LIST_TYPE = "java.util.List";
+    private static final String INT_TYPE = "int";
+    private static final String LONG_TYPE = "long";
+    private static final String DOUBLE_TYPE = "double";
+    private static final String BOOLEAN_TYPE = "boolean";
 
     /***
      *
@@ -40,6 +54,7 @@ public class PropertiesManager<T> implements IPropertiesManager<T>
         {
             String text = Resources.toString(url, Charsets.UTF_8);
             m_prop = gson.fromJson(text, m_typeParameterClass);
+            this.mergePropsFromEnv(m_prop);
         } else
         {
             throw new FileNotFoundException("property file '" + propFileName + "' not found in the classpath");
@@ -53,5 +68,63 @@ public class PropertiesManager<T> implements IPropertiesManager<T>
     public T getProperties()
     {
         return m_prop;
+    }
+
+    private void mergePropsFromEnv(Object prop){
+        m_logger.info("Inside merge from prop");
+        Field[] propFields = prop.getClass().getFields();
+        for(Field field : propFields){
+            String envVarName = field.getName().toUpperCase();
+            String override= System.getenv(envVarName);
+            if(override != null){
+                setProperty(field.getName(), override);
+            }
+        }
+    }
+
+    public void setProperty(String propName,String override){
+        try {
+            Field field = m_prop.getClass().getDeclaredField(propName);
+            String dataType = field.getType().getCanonicalName();
+            switch (dataType){
+                case LIST_TYPE:
+                    List<String> value = Arrays.asList(override.split(","));
+                    set(field,value);
+                    break;
+                case INT_TYPE:
+                    int intData = Integer.parseInt(override);
+                    set(field,intData);
+                    break;
+                case STRING_TYPE:
+                    set(field,override);
+                    break;
+                case LONG_TYPE:
+                    long longData = Long.parseLong(override);
+                    set(field,longData);
+                    break;
+                case DOUBLE_TYPE:
+                    double doubleData = Double.parseDouble(override);
+                    set(field,doubleData);
+                    break;
+                case BOOLEAN_TYPE:
+                    boolean booleanData = Boolean.parseBoolean(override);
+                    set(field,booleanData);
+                    break;
+                default:
+                    m_logger.error("Not Supported");
+            }
+
+        }catch(NoSuchFieldException Ex){
+            m_logger.error("Field cannot be found in the config "+ Ex.getMessage() );
+        }
+    }
+
+    private void set(Field field,Object value){
+        try{
+            m_logger.debug("Setting env : " + field.getName() + " as " + value );
+            field.set(m_prop,value);
+        }catch(IllegalAccessException Ex){
+            m_logger.error("Error while setting property "+ field.getName() + Ex.getMessage());
+        }
     }
 }

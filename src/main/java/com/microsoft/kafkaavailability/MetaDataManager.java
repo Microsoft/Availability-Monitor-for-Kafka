@@ -6,21 +6,27 @@
 
 package com.microsoft.kafkaavailability;
 
-import com.microsoft.kafkaavailability.properties.MetaDataManagerProperties;
 import com.google.gson.Gson;
-import org.apache.zookeeper.KeeperException;
-import scala.Option;
-import scala.collection.JavaConversions;
+import com.microsoft.kafkaavailability.properties.MetaDataManagerProperties;
 import kafka.javaapi.PartitionMetadata;
 import kafka.javaapi.TopicMetadata;
 import kafka.javaapi.TopicMetadataRequest;
 import kafka.javaapi.consumer.SimpleConsumer;
-import org.apache.zookeeper.ZooKeeper;
+import org.apache.curator.framework.CuratorFramework;
+import org.apache.zookeeper.KeeperException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import scala.Option;
+import scala.collection.JavaConversions;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
+import java.util.regex.Pattern;
+
+import static com.microsoft.kafkaavailability.discovery.CommonUtils.createTopicRegEx;
 
 /***
  * Gets the list of Kafka brokers.
@@ -28,13 +34,16 @@ import java.util.List;
  */
 public class MetaDataManager implements IMetaDataManager
 {
+    final static Logger m_logger = LoggerFactory.getLogger(MetaDataManager.class);
+    private CuratorFramework client;
+
     MetaDataManagerProperties m_mDProps;
     List<String> m_brokerIds;
 
-    public MetaDataManager(IPropertiesManager<MetaDataManagerProperties> propManager)
+    public MetaDataManager(CuratorFramework curatorFramework, IPropertiesManager<MetaDataManagerProperties> propManager)
     {
         m_mDProps = propManager.getProperties();
-
+        this.client = curatorFramework;
     }
 
     /***
@@ -56,6 +65,29 @@ public class MetaDataManager implements IMetaDataManager
         return m_brokerIds;
     }
 
+    @Override
+    public void createTopicIfNotExist(String topicName, int partitions, int replicationFactor) {
+        KafkaUtils.createTopic(topicName, partitions, replicationFactor, client);
+    }
+
+    @Override
+    public void createCanaryTopics() {
+        List<String> topics = new ArrayList<String>();
+        if (!m_mDProps.canaryTestTopics.isEmpty()) {
+            topics.addAll(m_mDProps.canaryTestTopics);
+            int replicationFactor = (m_mDProps.replicationFactor > 0) ? m_mDProps.replicationFactor : 3;
+            try {
+                List<String> brokerList = getBrokerList(true);
+
+                for (String topicName : topics) {
+                    createTopicIfNotExist(topicName, brokerList.size(), replicationFactor);
+                }
+            } catch (Exception e) {
+                m_logger.error(e.toString());
+            }
+        }
+    }
+
     /***
      * Gets list of broker IPs from zookeeper in the form 1.1.1.1:2181,2.2.2.2:2181
      *
@@ -64,19 +96,16 @@ public class MetaDataManager implements IMetaDataManager
      */
     private List<String> getBrokerListFromZooKeeper(boolean addPort) throws MetaDataManagerException
     {
-        ZooKeeper zooKeeper;
         List<String> brokerInfos = new ArrayList<String>();
         Gson gson = new Gson();
         int exceptionCount = 0;
         try
         {
-            System.out.println(m_mDProps.zooKeeperHosts + " " + m_mDProps.soTimeout);
-            zooKeeper = new ZooKeeper(m_mDProps.zooKeeperHosts, m_mDProps.soTimeout, null);
-            List<String> ids = zooKeeper.getChildren("/brokers/ids", false);
+            List<String> ids = client.getChildren().forPath("/brokers/ids");
 
             for (String id : ids)
             {
-                String brokerInfoStr = new String(zooKeeper.getData("/brokers/ids/" + id, false, null));
+                String brokerInfoStr = new String(client.getData().forPath("/brokers/ids/" + id));
                 BrokerInfo brokerInfo = gson.fromJson(brokerInfoStr, BrokerInfo.class);
                 if (addPort)
                 {
@@ -86,13 +115,12 @@ public class MetaDataManager implements IMetaDataManager
                     brokerInfos.add(brokerInfo.host);
                 }
             }
-            zooKeeper.close();
         } catch (ArrayIndexOutOfBoundsException e)
         {
             exceptionCount++;
             if (exceptionCount < m_mDProps.acceptable_exception_count)
             {
-                System.out.println(e.toString());
+                m_logger.error(e.toString());
             } else
             {
                 throw new MetaDataManagerException(e.getMessage());
@@ -107,11 +135,14 @@ public class MetaDataManager implements IMetaDataManager
         {
             throw new MetaDataManagerException(e.getMessage());
         }
-
+        catch (Exception e)
+        {
+            throw new MetaDataManagerException(e.getMessage());
+        }
 
         if (brokerInfos.isEmpty())
         {
-            System.out.println("Could not connect to ZooKeeper");
+            m_logger.info("Unable to get BrokerList From ZooKeeper. Check brokers if available.");
         }
         return brokerInfos;
     }
@@ -122,31 +153,31 @@ public class MetaDataManager implements IMetaDataManager
      * @return List topic metadata
      */
     @Override
-    public List<kafka.javaapi.TopicMetadata> getMetaDataFromAllBrokers()
-    {
+    public List<kafka.javaapi.TopicMetadata> getMetaDataFromAllBrokers() {
         List<String> topics = new ArrayList<String>();
-        if (m_mDProps.useWhiteList)
-        {
-            topics.addAll(m_mDProps.topicsWhitelist);
+        try {
+            m_brokerIds = getBrokerList(true);
+        } catch (Exception e) {
+            m_logger.error(e.toString());
         }
         TopicMetadataRequest req = new TopicMetadataRequest(topics);
         List<kafka.javaapi.TopicMetadata> allMetaData = new ArrayList<kafka.javaapi.TopicMetadata>();
-        for (String brokerId : m_brokerIds)
-        {
-            SimpleConsumer consumer = new SimpleConsumer(
-                    brokerId.split(":")[0],
-                    Integer.parseInt(brokerId.split(":")[1]),
-                    m_mDProps.soTimeout,
-                    m_mDProps.bufferSize,
-                    m_mDProps.clientId);
-            kafka.javaapi.TopicMetadataResponse resp = null;
-            try
-            {
+        for (String brokerId : m_brokerIds) {
+            SimpleConsumer consumer = null;
+            try {
+                consumer = new SimpleConsumer(
+                        brokerId.split(":")[0],
+                        Integer.parseInt(brokerId.split(":")[1]),
+                        m_mDProps.soTimeout,
+                        m_mDProps.bufferSize,
+                        m_mDProps.clientId);
+                kafka.javaapi.TopicMetadataResponse resp = null;
                 resp = consumer.send(req);
                 allMetaData.addAll(resp.topicsMetadata());
-            } catch (Exception e)
-            {
-                System.out.println(e);
+            } catch (Exception e) {
+                m_logger.error("Error communicating with Broker [" + brokerId + "]. Reason: " + e.getMessage(), e);
+            } finally {
+                if (consumer != null) consumer.close();
             }
         }
         return allMetaData;
@@ -159,11 +190,29 @@ public class MetaDataManager implements IMetaDataManager
      */
     public List<kafka.javaapi.TopicMetadata> getAllTopicPartition()
     {
-        List<kafka.javaapi.TopicMetadata> data = getMetaDataFromAllBrokers();
+        List<kafka.javaapi.TopicMetadata> topicMetadataList = getMetaDataFromAllBrokers();
         HashSet<TopicPartition> exploredTopicPartition = new HashSet<TopicPartition>();
         List<kafka.javaapi.TopicMetadata> ret = new ArrayList<TopicMetadata>();
-        for (TopicMetadata item : data)
+
+        // Filter any white list topics
+        HashSet<String> whiteListTopics = new HashSet<String>(m_mDProps.whiteListTopics);
+        if (!whiteListTopics.isEmpty()) {
+            topicMetadataList = filterWhitelistTopics(topicMetadataList, whiteListTopics);
+        }
+
+        // Filter all blacklist topics
+        HashSet<String> blackListTopics = new HashSet<String>(m_mDProps.blackListTopics);
+        String regex = "";
+        if (!blackListTopics.isEmpty()) {
+            regex = createTopicRegEx(blackListTopics);
+        }
+
+        for (TopicMetadata item : topicMetadataList)
         {
+            if (Pattern.matches(regex, item.topic())) {
+                m_logger.debug("Discarding topic (blacklisted): " + item.topic());
+                continue;
+            }
             List<kafka.api.PartitionMetadata> pml = new ArrayList<kafka.api.PartitionMetadata>();
             for (PartitionMetadata part : item.partitionsMetadata())
             {
@@ -179,7 +228,6 @@ public class MetaDataManager implements IMetaDataManager
                     pml.add(pm);
                     exploredTopicPartition.add(new TopicPartition(item.topic(), part.partitionId()));
                 }
-
             }
             if (pml.size() > 0)
             {
@@ -191,7 +239,22 @@ public class MetaDataManager implements IMetaDataManager
                 ret.add(new kafka.javaapi.TopicMetadata(tm));
             }
         }
+        Collections.sort(ret, new TopicMetadataComparator());
         return ret;
+    }
+
+    public List<TopicMetadata> filterWhitelistTopics(List<TopicMetadata> topicMetadataList,
+                                                     HashSet<String> whiteListTopics) {
+        ArrayList<TopicMetadata> filteredTopics = new ArrayList<TopicMetadata>();
+        String regex = createTopicRegEx(whiteListTopics);
+        for (TopicMetadata topicMetadata : topicMetadataList) {
+            if (Pattern.matches(regex, topicMetadata.topic())) {
+                filteredTopics.add(topicMetadata);
+            } else {
+                m_logger.debug("Discarding topic (non-whitelisted): " + topicMetadata.topic());
+            }
+        }
+        return filteredTopics;
     }
 
     /***
@@ -203,7 +266,7 @@ public class MetaDataManager implements IMetaDataManager
         List<kafka.javaapi.TopicMetadata> data = getAllTopicPartition();
         for (kafka.javaapi.TopicMetadata item : data)
         {
-            System.out.println("Topic: " + item.topic());
+            m_logger.info("Topic: " + item.topic());
             for (kafka.javaapi.PartitionMetadata part : item.partitionsMetadata())
             {
                 String replicas = "";
@@ -222,8 +285,19 @@ public class MetaDataManager implements IMetaDataManager
                     if (part.leader().host() != null)
                         leader = part.leader().host();
                 }
-                System.out.println("    Partition: " + part.partitionId() + ": Leader: " + leader + " Replicas:[" + replicas + "] ISR:[" + isr + "]");
+                m_logger.info("    Partition: " + part.partitionId() + ": Leader: " + leader + " Replicas:[" + replicas + "] ISR:[" + isr + "]");
             }
+        }
+    }
+
+    /***
+     * Releases all resources
+     */
+    public void close()
+    {
+        if(client != null)
+        {
+            m_logger.debug("Closing the client");
         }
     }
 }

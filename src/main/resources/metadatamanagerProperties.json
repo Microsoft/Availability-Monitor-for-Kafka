@@ -3,7 +3,14 @@
     "broker1:port",
     "broker2:port"
   ],
-  "useWhiteList": false,
+  "whiteListTopics":[],
+  "blackListTopics":[
+    "__consumer_offsets"
+  ],
+  "canaryTestTopics":[
+    "testtopic"
+  ],
+  "replicationFactor": 3,
   "soTimeout": 100000,
   "bufferSize": 65536,
   "clientId": "test",

@@ -1,0 +1,6 @@
+{
+  "reportersCommaSeparatedList": "consoleReporter",
+  "statsdEndpoint": "localhost",
+  "statsdPort": 8125,
+  "metricsNamespace": "KAT"
+}

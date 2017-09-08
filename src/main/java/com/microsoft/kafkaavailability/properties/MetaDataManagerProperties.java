@@ -12,12 +12,14 @@ import java.util.List;
 public class MetaDataManagerProperties
 {
     public List<String> brokerList;
-    public List<String> topicsWhitelist;
-    public boolean useWhiteList;
+    public List<String> whiteListTopics;
+    public List<String> canaryTestTopics;
+    public int replicationFactor;
     public int soTimeout;
     public int bufferSize;
     public String clientId;
     public String zooKeeperHosts;
     public boolean useZooKeeper;
     public Integer acceptable_exception_count;
+    public List<String> blackListTopics;
 }
