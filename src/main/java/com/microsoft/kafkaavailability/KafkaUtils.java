@@ -5,19 +5,16 @@
 
 package com.microsoft.kafkaavailability;
 
-import org.I0Itec.zkclient.ZkClient;
-import org.I0Itec.zkclient.serialize.ZkSerializer;
-import org.apache.curator.framework.CuratorFramework;
-
 import kafka.admin.AdminOperationException;
 import kafka.admin.AdminUtils;
 import kafka.common.TopicExistsException;
-import kafka.utils.ZkUtils;
 import kafka.utils.ZKStringSerializer$;
+import org.I0Itec.zkclient.ZkClient;
+import org.apache.curator.framework.CuratorFramework;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.*;
+import java.util.Properties;
 
 /**
  * Kafka utility functions.
@@ -79,7 +76,7 @@ public class KafkaUtils {
     }
 
     public static boolean topicExists(String topic, CuratorFramework curatorFramework) {
-        ZkClient zkClient = fromCurator(curatorFramework);
+        ZkClient zkClient = null;
         try {
             zkClient = fromCurator(curatorFramework);
             return AdminUtils.topicExists(zkClient, topic);
